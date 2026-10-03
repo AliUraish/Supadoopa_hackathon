@@ -3,7 +3,14 @@
 # Supabase Hackathon
 
 Next.js 16 (App Router, Turbopack, Tailwind v4) + Supabase (Auth + Postgres), deployed on Vercel.
-Stripe billing lives in the separate FastAPI service in `backend/` — don't add Stripe code to the Next.js app; call the backend with the user's access token (`Authorization: Bearer <session.access_token>`).
+Stripe billing lives in the separate FastAPI service in `backend/` (contract in `backend/README.md`) — don't add Stripe code to the Next.js app.
+
+## Billing in the frontend
+- `lib/billing.ts` (server-only) calls the billing API at `BILLING_API_URL` with the user's Supabase access token; the browser never talks to it directly.
+- `app/billing/actions.ts`: `startCheckout` (form field `lookup_key`) and `openPortal` server actions redirect to Stripe.
+- Pages: `/pricing` (catalog + checkout, Stripe cancel target), `/billing/success` (polls until the webhook grants access), plan + Manage billing on `/dashboard`.
+- Every billing call is wrapped so pages still render when the API is down or not deployed.
+- Local: run the API with `cd backend && uv run uvicorn app.main:app --port 8000`. On Vercel, set `BILLING_API_URL` once the backend is deployed.
 
 ## Projects
 - Supabase: `Supabase_Hackathon`, ref `bwqjknrqcqelgpixzwut` (us-east-1). Use this ref for every Supabase MCP call. The org also has `Machanize US West` (`kidmwrkraozhsdiycxju`) — never touch it.
