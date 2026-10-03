@@ -1,101 +1,83 @@
 @import "tailwindcss";
 
-/* ── Doorway pixel theme: Supabase black + green, CRT-flavoured ───────────── */
+/* ── Doorway: clean dark Supabase-style system ──────────────────────────────
+   One accent (Supabase green), thin borders, Geist. Status colours are for status only. */
 
 @theme {
-  --color-bg: #060807;
-  --color-bg-2: #0b0e0c;
-  --color-panel: #0f1311;
-  --color-panel-2: #151a17;
-  --color-panel-3: #1b211e;
-  --color-line: #232b27;
-  --color-line-2: #34423b;
-  --color-text: #e3f5ea;
-  --color-muted: #8fa198;
-  --color-faint: #5a6a62;
+  --color-bg: #121212;
+  --color-bg-2: #0f0f0f;
+  --color-panel: #171717;
+  --color-panel-2: #1c1c1c;
+  --color-panel-3: #232323;
+  --color-line: #2a2a2a;
+  --color-line-2: #363636;
+  --color-text: #ededed;
+  --color-muted: #a1a1a1;
+  --color-faint: #6b6b6b;
   --color-green: #3ecf8e;
-  --color-green-hi: #8cffc6;
+  --color-green-hi: #6ee7b7;
   --color-green-dim: #24b47e;
-  --color-green-deep: #0e3b27;
-  --color-green-ink: #03130b;
-  --color-red: #ff5f56;
-  --color-amber: #ffb224;
-  --color-blue: #4cb4ff;
-  --color-violet: #b18cff;
-  --color-gold: #f7d046;
+  --color-green-deep: #133b2a;
+  --color-green-ink: #0b1f16;
+  --color-red: #f06a6a;
+  --color-amber: #f5a524;
+  --color-blue: #5ea8ff;
+  --color-violet: #a78bfa;
+  --color-gold: #e9c46a;
 
   /* Old scaffold names, kept so untouched pages still theme correctly. */
-  --color-background: #060807;
-  --color-foreground: #e3f5ea;
+  --color-background: #121212;
+  --color-foreground: #ededed;
 
-  --font-pixel: var(--font-press-start), ui-monospace, monospace;
-  --font-term: var(--font-vt323), ui-monospace, monospace;
-  --font-sans: var(--font-vt323), ui-monospace, monospace;
-  --font-mono: var(--font-vt323), ui-monospace, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
-  /* VT323 draws small: scale the type ramp up so text-sm etc. stay readable. */
-  --text-xs: 1rem;
-  --text-xs--line-height: 1.15;
-  --text-sm: 1.15rem;
-  --text-sm--line-height: 1.2;
-  --text-base: 1.3rem;
-  --text-base--line-height: 1.25;
-  --text-lg: 1.5rem;
-  --text-lg--line-height: 1.25;
-  --text-xl: 1.75rem;
-  --text-xl--line-height: 1.2;
-  --text-2xl: 2.1rem;
-  --text-2xl--line-height: 1.15;
-  --text-3xl: 2.6rem;
-  --text-3xl--line-height: 1.1;
-  --text-4xl: 3.2rem;
-  --text-4xl--line-height: 1.05;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 
-  /* Pixels have no curves. */
-  --radius-xs: 0;
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
-  --radius-2xl: 0;
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
-  --animate-blink: px-blink 1s steps(2, start) infinite;
-  --animate-pulse-px: px-pulse 1.2s steps(3, end) infinite;
-  --animate-march: px-march 0.6s steps(4, end) infinite;
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
+  --animate-rise: rise 180ms var(--ease-out-soft);
 }
 
-@keyframes px-blink {
-  to {
-    visibility: hidden;
-  }
-}
-@keyframes px-pulse {
+@keyframes breathe {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.45;
   }
 }
-@keyframes px-march {
-  to {
-    background-position: 16px 0;
-  }
-}
-@keyframes px-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes px-rise {
+@keyframes rise {
   from {
-    transform: translateY(6px);
+    transform: translateY(8px);
     opacity: 0;
   }
   to {
     transform: none;
     opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
   }
 }
 
@@ -105,220 +87,163 @@ html {
 }
 
 body {
-  background-color: var(--color-bg);
-  background-image:
-    radial-gradient(circle at 50% -20%, rgba(62, 207, 142, 0.1), transparent 55%),
-    radial-gradient(rgba(62, 207, 142, 0.07) 1px, transparent 1px);
-  background-size:
-    100% 100%,
-    16px 16px;
+  background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-term);
-  font-size: 1.3rem;
-  line-height: 1.25;
-}
-
-/* CRT scanlines over everything (subtle enough for a projector). */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 90;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent 2px,
-    rgba(0, 0, 0, 0.16) 3px,
-    transparent 4px
-  );
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--color-green);
-  color: var(--color-green-ink);
+  background: color-mix(in srgb, var(--color-green) 35%, transparent);
+  color: var(--color-text);
 }
 
 * {
-  scrollbar-color: var(--color-line-2) var(--color-bg-2);
+  scrollbar-color: var(--color-line-2) transparent;
   scrollbar-width: thin;
 }
 
 :focus-visible {
-  outline: 2px dashed var(--color-green-hi);
-  outline-offset: 3px;
-}
-
-@layer base {
-  .font-pixel {
-    font-family: var(--font-pixel);
-    -webkit-font-smoothing: none;
-    letter-spacing: 0.02em;
-    line-height: 1.6;
-  }
+  outline: 2px solid color-mix(in srgb, var(--color-green) 70%, transparent);
+  outline-offset: 2px;
 }
 
 @layer components {
-  /* Notched 2px pixel border (no corner pixels), colour via --frame. */
-  .px-frame {
-    --frame: var(--color-line-2);
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame);
+  /* Card surface. Recolour the border with --frame. */
+  .px-panel {
+    --frame: var(--color-line);
+    background: var(--color-panel);
+    border: 1px solid var(--frame);
+    border-radius: var(--radius-lg);
   }
 
-  .px-panel {
-    --frame: var(--color-line-2);
-    background: var(--color-panel);
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame),
-      6px 6px 0 0 rgba(0, 0, 0, 0.55);
+  .px-frame {
+    --frame: var(--color-line);
+    border: 1px solid var(--frame);
+    border-radius: var(--radius-md);
   }
 
   .px-inset {
     --frame: var(--color-line);
     background: var(--color-bg-2);
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame),
-      inset 3px 3px 0 0 rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--frame);
+    border-radius: var(--radius-md);
   }
 
   .px-btn {
     --btn-bg: var(--color-green);
-    --btn-fg: var(--color-green-ink);
-    --frame: #000;
-    position: relative;
+    --btn-fg: #0b1f16;
+    --btn-border: color-mix(in srgb, var(--color-green) 60%, #000);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    font-family: var(--font-pixel);
-    -webkit-font-smoothing: none;
-    font-size: 10px;
+    gap: 0.4rem;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 500;
     line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 10px 14px;
+    white-space: nowrap;
+    border-radius: var(--radius-md);
     background: var(--btn-bg);
     color: var(--btn-fg);
+    border: 1px solid var(--btn-border);
     cursor: pointer;
     user-select: none;
-    white-space: nowrap;
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame),
-      inset -3px -3px 0 0 rgba(0, 0, 0, 0.35),
-      inset 3px 3px 0 0 rgba(255, 255, 255, 0.28);
-    transition: filter 80ms steps(2);
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
   }
   .px-btn:hover:not(:disabled) {
-    filter: brightness(1.12);
-  }
-  .px-btn:active:not(:disabled) {
-    transform: translateY(2px);
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame),
-      inset 3px 3px 0 0 rgba(0, 0, 0, 0.35);
+    --btn-bg: var(--color-green-dim);
   }
   .px-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.5;
     cursor: not-allowed;
   }
   .px-btn--ghost {
-    --btn-bg: var(--color-panel-3);
+    --btn-bg: var(--color-panel-2);
     --btn-fg: var(--color-text);
-    --frame: var(--color-line-2);
+    --btn-border: var(--color-line-2);
+  }
+  .px-btn--ghost:hover:not(:disabled) {
+    --btn-bg: var(--color-panel-3);
   }
   .px-btn--danger {
-    --btn-bg: var(--color-red);
-    --btn-fg: #1a0302;
+    --btn-bg: color-mix(in srgb, var(--color-red) 14%, var(--color-panel));
+    --btn-fg: var(--color-red);
+    --btn-border: color-mix(in srgb, var(--color-red) 40%, transparent);
+  }
+  .px-btn--danger:hover:not(:disabled) {
+    --btn-bg: color-mix(in srgb, var(--color-red) 22%, var(--color-panel));
   }
   .px-btn--warn {
-    --btn-bg: var(--color-amber);
-    --btn-fg: #1d1200;
+    --btn-bg: color-mix(in srgb, var(--color-amber) 14%, var(--color-panel));
+    --btn-fg: var(--color-amber);
+    --btn-border: color-mix(in srgb, var(--color-amber) 40%, transparent);
+  }
+  .px-btn--warn:hover:not(:disabled) {
+    --btn-bg: color-mix(in srgb, var(--color-amber) 22%, var(--color-panel));
   }
   .px-btn--sm {
-    font-size: 8px;
-    padding: 7px 9px;
+    height: 26px;
+    padding: 0 9px;
+    font-size: 12px;
   }
   .px-btn--lg {
-    font-size: 12px;
-    padding: 14px 20px;
+    height: 40px;
+    padding: 0 18px;
+    font-size: 14px;
   }
 
   .px-input {
-    --frame: var(--color-line-2);
     width: 100%;
+    height: 34px;
     background: var(--color-bg-2);
     color: var(--color-text);
-    font-family: var(--font-term);
-    font-size: 1.25rem;
-    line-height: 1.2;
-    padding: 6px 10px;
-    box-shadow:
-      0 -2px 0 0 var(--frame),
-      0 2px 0 0 var(--frame),
-      -2px 0 0 0 var(--frame),
-      2px 0 0 0 var(--frame),
-      inset 3px 3px 0 0 rgba(0, 0, 0, 0.55);
+    font-size: 13px;
+    padding: 0 10px;
+    border: 1px solid var(--color-line-2);
+    border-radius: var(--radius-md);
     outline: none;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  textarea.px-input {
+    height: auto;
+    padding: 8px 10px;
   }
   .px-input:focus {
-    --frame: var(--color-green);
+    border-color: var(--color-green-dim);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-green) 18%, transparent);
   }
   .px-input::placeholder {
     color: var(--color-faint);
   }
   select.px-input {
     appearance: none;
-    background-image:
-      linear-gradient(45deg, transparent 50%, var(--color-green) 50%),
-      linear-gradient(135deg, var(--color-green) 50%, transparent 50%);
-    background-position:
-      calc(100% - 16px) 55%,
-      calc(100% - 11px) 55%;
-    background-size: 5px 5px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a1' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    padding-right: 28px;
+    background-position: right 10px center;
+    padding-right: 30px;
   }
 
-  .px-glow {
-    text-shadow:
-      0 0 8px rgba(62, 207, 142, 0.55),
-      0 0 1px rgba(140, 255, 198, 0.8);
-  }
-
-  /* Animated dashed "wire" (workspace connections, live strips). */
-  .px-wire {
-    background-image: linear-gradient(90deg, var(--color-green) 50%, transparent 50%);
-    background-size: 16px 2px;
-    background-repeat: repeat-x;
-    animation: px-march 0.6s steps(4, end) infinite;
-  }
-
+  /* Motion helpers. */
   .px-rise {
-    animation: px-rise 180ms steps(3, end);
+    animation: rise 180ms var(--ease-out-soft);
   }
-
   .px-spin {
-    animation: px-spin 1s steps(8, end) infinite;
+    animation: spin 0.9s linear infinite;
   }
-
-  .pixelated {
-    image-rendering: pixelated;
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-panel-2) 25%, var(--color-panel-3) 50%, var(--color-panel-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-md);
   }
 }
 
@@ -328,5 +253,6 @@ body::after {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

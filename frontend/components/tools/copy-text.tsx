@@ -3,7 +3,7 @@
 // Inline click-to-copy text (MCP tool names, payment references).
 
 import { useState, type ReactNode } from "react";
-import { PixelIcon } from "@/components/px/icons";
+import { Icon } from "@/components/px/icons";
 import { cx } from "@/components/px/ui";
 
 /** "pi_test_3Qx…9aF2" */
@@ -38,7 +38,7 @@ export function CopyText({
       className={cx("inline-flex min-w-0 items-center gap-1.5 text-left hover:text-green", className)}
     >
       <span className="min-w-0 truncate">{children ?? value}</span>
-      <PixelIcon name={copied ? "verify" : "copy"} size={10} className={cx("shrink-0", copied && "text-green")} />
+      <Icon name={copied ? "verify" : "copy"} size={13} className={cx("shrink-0 text-faint", copied && "text-green")} />
     </button>
   );
 }

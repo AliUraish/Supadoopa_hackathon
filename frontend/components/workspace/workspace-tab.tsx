@@ -1,44 +1,29 @@
 "use client";
 
-// The Workspace tab: a pixel control room seen from the side. Your agent (left) talks to the
-// Doorway broker (centre, with its live pipeline), which hands jobs to Supabase Compute
-// sandboxes (right) that share memory in Postgres. Wires carry a packet for every live event.
-// Data hooks and the chat live here so they survive tab switches; the scene only renders
-// (and animates) while the tab is active.
+// The Workspace tab: a live 3D network (agent → Doorway → Supabase Compute → Postgres) on top,
+// then the agent console beside the workflow log, then the message board and a job/pattern
+// summary. Data hooks and the chat live here so they survive tab switches; the scene only
+// animates while the tab is active.
 
 import { useState } from "react";
-import {
-  doorway,
-  type DoorwayEvent,
-  type Job,
-  type Message,
-  type Pattern,
-  type RowChange,
-  type Sandbox,
-  type Site,
-} from "@/lib/doorway";
-import { eventStyle, MESSAGE_STYLE, messageSummary, stageForEvent, timeAgo, type Stage } from "@/lib/doorway/format";
-import { useFeed, useLive, useNow, type FeedResult, type LiveResult } from "@/lib/doorway/live";
+import { doorway, type DoorwayEvent, type Job, type Message, type Pattern, type RowChange } from "@/lib/doorway";
+import { fmtInt, TONE_COLOR, type Tone } from "@/lib/doorway/format";
+import { useFeed, useLive, type LiveResult } from "@/lib/doorway/live";
 import { EventFeed, MessageBoard } from "@/components/feeds/event-feed";
-import { ConnectAgent } from "@/components/connect-agent";
-import { LiveBadge } from "@/components/px/client";
-import { cx, StatusDot } from "@/components/px/ui";
+import { useDashboardNav } from "@/components/dashboard/dashboard-tabs";
+import { Button, Empty, ErrorBanner, Panel, Skeleton } from "@/components/px/ui";
 import { AgentConsole } from "./agent-console";
-import { AgentDesk, type AgentBubble } from "./agent-desk";
-import { ComputeRoom, type SandboxBubble } from "./compute-room";
-import { CurrentEvent, DoorScene, Pipeline, type StageHit } from "./doorway-column";
-import { packetForEvent, packetForMessage, patternIdOf, truncate, type PacketSpec } from "./flow";
-import { useAgentChat, type AgentChat } from "./use-agent-chat";
-import { computeRoutes, useStageLayout, WireOverlay, type WireSpec } from "./wires";
-import styles from "./workspace.module.css";
-
-const AGENT_KINDS = new Set(["request.received", "execute.call", "payment.challenge", "payment.paid"]);
+import { packetForEvent, packetForMessage, type PacketSpec } from "./flow";
+import { ScenePanel } from "./scene-panel";
+import { useAgentChat } from "./use-agent-chat";
 
 function patternChange(c: RowChange): boolean {
   if (c.table === "doorway_messages") return (c.row as Message).kind === "pattern_published";
   const kind = (c.row as DoorwayEvent).kind;
   return kind === "reuse.pattern" || kind === "publish.tool";
 }
+
+type Base = { e: number | null; m: number | null };
 
 export function WorkspaceTab({ active }: { active: boolean }) {
   const sites = useLive("ws:sites", () => doorway.sites(), { tables: ["doorway_tools"] });
@@ -61,86 +46,9 @@ export function WorkspaceTab({ active }: { active: boolean }) {
   });
   const chat = useAgentChat(events.items[0]?.id ?? 0, messages.items[0]?.id ?? 0);
 
-  if (!active) return null;
-  return (
-    <div className="flex flex-col gap-4">
-      <WorkspaceScene
-        sites={sites}
-        sandboxes={sandboxes}
-        jobs={jobs}
-        patterns={patterns}
-        events={events}
-        messages={messages}
-        chat={chat}
-      />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <EventFeed title="Workflow log" bodyClassName="max-h-[260px]" />
-        <MessageBoard title="Sandbox message board" bodyClassName="max-h-[260px]" />
-      </div>
-    </div>
-  );
-}
-
-function StatusLine({
-  sandboxes,
-  jobs,
-  latest,
-}: {
-  sandboxes: Sandbox[] | undefined;
-  jobs: Job[] | undefined;
-  latest: DoorwayEvent | undefined;
-}) {
-  const now = useNow();
-  const list = sandboxes ?? [];
-  const online = list.filter((s) => s.status !== "offline").length;
-  const running = jobs ? jobs.filter((j) => j.status === "running").length : list.filter((s) => s.status === "busy").length;
-  const queued = jobs ? jobs.filter((j) => j.status === "queued").length : null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b-2 border-line bg-panel-2 px-3 py-2">
-      <span className="font-pixel flex items-center gap-2 text-[9px] uppercase text-text">
-        <StatusDot tone={online ? "ok" : "bad"} size={8} pulse={running > 0} />
-        {online}/{list.length} sandboxes online
-      </span>
-      <span className="text-base text-muted">
-        <span className="text-blue">{running}</span> job{running === 1 ? "" : "s"} running
-        {queued !== null && (
-          <>
-            {" · "}
-            <span className="text-text">{queued}</span> queued
-          </>
-        )}
-      </span>
-      <span className="text-base text-muted" suppressHydrationWarning>
-        last event {latest && now ? timeAgo(latest.created_at, now) : "—"}
-      </span>
-      <LiveBadge className="ml-auto" />
-    </div>
-  );
-}
-
-type Base = { e: number | null; m: number | null };
-
-function WorkspaceScene({
-  sites,
-  sandboxes,
-  jobs,
-  patterns,
-  events,
-  messages,
-  chat,
-}: {
-  sites: LiveResult<Site[]>;
-  sandboxes: LiveResult<Sandbox[]>;
-  jobs: LiveResult<Job[]>;
-  patterns: LiveResult<Pattern[]>;
-  events: FeedResult<DoorwayEvent>;
-  messages: FeedResult<Message>;
-  chat: AgentChat;
-}) {
+  // Only rows that arrive after the first load become particles (the backlog stays still).
   const ev = events.items;
   const msgs = messages.items;
-
-  // Only rows that arrive after the scene mounts animate (no burst of history on load).
   const [base, setBase] = useState<Base>(() => ({
     e: events.loading ? null : (ev[0]?.id ?? 0),
     m: messages.loading ? null : (msgs[0]?.id ?? 0),
@@ -151,120 +59,111 @@ function WorkspaceScene({
       m: base.m ?? (messages.loading ? null : (msgs[0]?.id ?? 0)),
     });
   }
-  const freshEvents = base.e === null ? [] : ev.filter((e) => e.id > (base.e ?? 0)).slice(0, 40);
-  const freshMessages = base.m === null ? [] : msgs.filter((m) => m.id > (base.m ?? 0)).slice(0, 20);
-
-  // Pipeline: the latest staged event glows; stages hit since mount fade out.
-  const latestStaged = ev.find((e) => stageForEvent(e.kind));
-  const current = latestStaged
-    ? { stage: stageForEvent(latestStaged.kind) as Stage, tone: eventStyle(latestStaged.kind).tone }
-    : null;
-  const hits: Partial<Record<Stage, StageHit>> = {};
-  for (const e of freshEvents) {
-    const stage = stageForEvent(e.kind);
-    if (stage && !hits[stage]) hits[stage] = { key: e.id, tone: eventStyle(e.kind).tone };
-  }
-  const counts: Partial<Record<Stage, number>> = {};
-  for (const e of ev) {
-    const stage = stageForEvent(e.kind);
-    if (stage) counts[stage] = (counts[stage] ?? 0) + 1;
-  }
-
-  // Speech bubbles: the agent echoes agent-side events, sandboxes say their latest message.
-  const agentEvent = freshEvents.find((e) => AGENT_KINDS.has(e.kind));
-  const agentBubble: AgentBubble | null = agentEvent
-    ? {
-        key: agentEvent.id,
-        icon: eventStyle(agentEvent.kind).icon,
-        tone: eventStyle(agentEvent.kind).tone,
-        text: truncate(agentEvent.message, 60),
-      }
-    : null;
-  const bubbles: Record<string, SandboxBubble> = {};
-  for (const m of freshMessages) {
-    if (bubbles[m.from_sandbox]) continue;
-    const style = MESSAGE_STYLE[m.kind] ?? MESSAGE_STYLE.hello;
-    bubbles[m.from_sandbox] = {
-      key: m.id,
-      icon: style.icon,
-      tone: style.tone,
-      text: `${style.label} ${truncate(messageSummary(m.body), 40)} → ${m.to_sandbox ?? "all"}`,
-    };
-  }
-  const flashRow = [...freshEvents, ...freshMessages]
-    .map((r) => ({ id: r.id, pid: patternIdOf(r) }))
-    .find((r) => r.pid !== null);
-  const patternFlash = flashRow && flashRow.pid !== null ? { patternId: flashRow.pid, key: flashRow.id } : null;
-
-  // Wires + packets.
-  const sbList = sandboxes.data ?? [];
-  const sbIds = sbList.map((s) => s.id);
-  const { ref, layout } = useStageLayout(`${sbIds.join(",")}|${sandboxes.loading}`);
-  const routes = computeRoutes(layout, sbIds);
-  const [done, setDone] = useState<string[]>([]);
   const packets: PacketSpec[] = [
-    ...freshEvents.slice(0, 10).map(packetForEvent),
-    ...freshMessages.slice(0, 6).map(packetForMessage),
-  ].filter((p): p is PacketSpec => p !== null && routes.has(p.route) && !done.includes(p.key));
-  const recentRoutes = new Set(packets.map((p) => p.route));
-  const wires: WireSpec[] = [
-    { id: "agent>door", state: chat.busy || recentRoutes.has("agent>door") ? "hot" : "idle" },
-    ...sbList.flatMap((s): WireSpec[] => {
-      const state = s.status === "offline" ? "dead" : s.status === "busy" ? "hot" : "idle";
-      return [
-        { id: `door>sb:${s.id}`, state: state === "idle" && recentRoutes.has(`door>sb:${s.id}`) ? "hot" : state },
-        { id: `sb:${s.id}>db`, state: state === "idle" && recentRoutes.has(`sb:${s.id}>db`) ? "hot" : state },
-      ];
-    }),
-  ];
+    ...(base.e === null ? [] : ev.filter((e) => e.id > (base.e ?? 0)).slice(0, 30).map(packetForEvent)),
+    ...(base.m === null ? [] : msgs.filter((m) => m.id > (base.m ?? 0)).slice(0, 12).map(packetForMessage)),
+  ].filter((p): p is PacketSpec => p !== null);
 
   return (
-    <section
-      ref={ref}
-      aria-label="Workspace"
-      className={cx(styles.stage, "px-panel relative isolate flex flex-col")}
-    >
-      <StatusLine sandboxes={sandboxes.data} jobs={jobs.data} latest={ev[0]} />
-      <div className="grid gap-6 p-4 md:grid-cols-2 xl:grid-cols-[minmax(0,30fr)_minmax(0,22fr)_minmax(0,48fr)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <AgentDesk thinking={chat.busy} bubble={agentBubble} />
-          <AgentConsole
-            chat={chat}
-            sites={sites.data}
-            sitesLoading={sites.loading}
-            sitesError={sites.error}
-            events={ev}
-            messages={msgs}
-          />
-          <ConnectAgent />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
-          <DoorScene flashKey={freshEvents[0]?.id ?? null} flashTone={freshEvents[0] ? eventStyle(freshEvents[0].kind).tone : "ok"} />
-          <Pipeline current={current} hits={hits} counts={counts} />
-          <CurrentEvent event={ev[0]} loading={events.loading} error={events.error} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 md:col-span-2 xl:col-span-1">
-          <ComputeRoom
-            sandboxes={sandboxes.data}
-            sandboxesLoading={sandboxes.loading}
-            sandboxesError={sandboxes.error}
-            bubbles={bubbles}
-            patterns={patterns.data}
-            patternsLoading={patterns.loading}
-            patternsError={patterns.error}
-            patternFlash={patternFlash}
-            jobs={jobs.data}
-            jobsError={jobs.error}
-          />
-        </div>
-      </div>
-      <WireOverlay
-        layout={layout}
-        routes={routes}
-        wires={wires}
+    <div className="flex flex-col gap-4">
+      <ScenePanel
+        active={active}
+        sandboxes={sandboxes.data}
+        sandboxesLoading={sandboxes.loading}
+        jobs={jobs.data}
+        patterns={patterns.data?.length ?? 0}
+        latest={ev[0]}
         packets={packets}
-        onPacketDone={(key) => setDone((prev) => [...prev.slice(-60), key])}
+        agentBusy={chat.busy}
       />
-    </section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AgentConsole
+          chat={chat}
+          sites={sites.data}
+          sitesLoading={sites.loading}
+          sitesError={sites.error}
+          events={ev}
+          messages={msgs}
+        />
+        <EventFeed title="Workflow log" bodyClassName="max-h-[560px]" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <MessageBoard title="Sandbox message board" bodyClassName="max-h-[320px]" />
+        <Summary jobs={jobs} patterns={patterns} />
+      </div>
+    </div>
+  );
+}
+
+// ── Jobs + shared memory ─────────────────────────────────────────────────────
+
+const JOB_STATES: { key: Job["status"]; label: string; tone: Tone }[] = [
+  { key: "queued", label: "Queued", tone: "muted" },
+  { key: "running", label: "Running", tone: "info" },
+  { key: "done", label: "Done", tone: "ok" },
+  { key: "failed", label: "Failed", tone: "bad" },
+];
+
+function Summary({ jobs, patterns }: { jobs: LiveResult<Job[]>; patterns: LiveResult<Pattern[]> }) {
+  const { goTo } = useDashboardNav();
+  const counts = Object.fromEntries(JOB_STATES.map((s) => [s.key, 0])) as Record<Job["status"], number>;
+  for (const j of jobs.data ?? []) counts[j.status] = (counts[j.status] ?? 0) + 1;
+  const top = [...(patterns.data ?? [])].sort((a, b) => b.used_by.length - a.used_by.length || b.success_count - a.success_count).slice(0, 5);
+
+  return (
+    <Panel
+      title="Jobs and shared memory"
+      icon="database"
+      actions={
+        <Button size="sm" variant="ghost" onClick={() => goTo("sandboxes")}>
+          Sandboxes
+        </Button>
+      }
+      bodyClassName="flex flex-col gap-4"
+    >
+      <div>
+        <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">Job queue</h3>
+        {jobs.loading ? (
+          <Skeleton className="h-14" />
+        ) : jobs.error && !jobs.data ? (
+          <ErrorBanner error={jobs.error} />
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            {JOB_STATES.map((s) => (
+              <div key={s.key} className="rounded-md border border-line bg-panel-2 px-2.5 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-faint">
+                  <span className="size-1.5 rounded-full" style={{ background: TONE_COLOR[s.tone] }} />
+                  {s.label}
+                </div>
+                <div className="text-lg font-semibold tabular-nums text-text">{fmtInt(counts[s.key])}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div>
+        <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-faint">Patterns in Postgres</h3>
+        {patterns.loading ? (
+          <Skeleton className="h-20" />
+        ) : patterns.error && !patterns.data ? (
+          <ErrorBanner error={patterns.error} />
+        ) : !top.length ? (
+          <Empty icon="pattern" title="No shared patterns yet" hint="Sandboxes publish one when a tool verifies." className="py-3" />
+        ) : (
+          <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
+            {top.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
+                <span className="min-w-0 truncate font-mono text-[12px] text-text" title={p.description ?? undefined}>
+                  {p.name}
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-faint">
+                  {p.used_by.length} site{p.used_by.length === 1 ? "" : "s"} · {fmtInt(p.success_count)} ok
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Panel>
   );
 }

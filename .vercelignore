@@ -2,3 +2,4 @@ backend/
 .env
 .env*.local
 supabase/.temp
+**/.next

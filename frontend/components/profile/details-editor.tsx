@@ -5,7 +5,7 @@
 import { useState, type FormEvent } from "react";
 import { doorway, PROFILE_FIELDS, type Profile } from "@/lib/doorway";
 import { useAction } from "@/lib/doorway/live";
-import { PixelIcon } from "@/components/px/icons";
+import { Icon } from "@/components/px/icons";
 import { Button, ErrorBanner, Field, Input } from "@/components/px/ui";
 import { FIELD_INPUT, fieldLabel } from "./fields";
 
@@ -46,7 +46,7 @@ export function DetailsEditor({
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-4">
       {keys.map((key) => {
         const input = FIELD_INPUT[key] ?? { type: "text", autoComplete: "off", placeholder: "" };
         const value = values[key] ?? "";
@@ -57,8 +57,8 @@ export function DetailsEditor({
             label={
               <span className="flex items-center gap-2">
                 {fieldLabel(key)}
-                <code className="font-term text-sm normal-case text-faint">{key}</code>
-                {changed && <span className="text-amber">· edited</span>}
+                <code className="font-mono text-[11px] font-normal text-faint">{key}</code>
+                {changed && <span className="ml-auto text-[11px] font-normal text-amber">Edited</span>}
               </span>
             }
           >
@@ -74,7 +74,8 @@ export function DetailsEditor({
               <Button
                 variant="ghost"
                 size="sm"
-                icon="broken"
+                icon="close"
+                className="shrink-0"
                 aria-label={`Clear ${fieldLabel(key)}`}
                 title="Clear (then Save)"
                 disabled={!value || save.pending}
@@ -87,22 +88,22 @@ export function DetailsEditor({
 
       <ErrorBanner error={save.error} />
 
-      <div className="flex flex-wrap items-center gap-3 pt-1">
-        <Button type="submit" icon="verify" loading={save.pending} disabled={!dirty}>
+      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+        <Button type="submit" size="sm" loading={save.pending} disabled={!dirty}>
           Save
         </Button>
         {dirty && (
-          <Button variant="ghost" onClick={() => setDraft(null)} disabled={save.pending}>
+          <Button variant="ghost" size="sm" onClick={() => setDraft(null)} disabled={save.pending}>
             Discard
           </Button>
         )}
         {flash && (
-          <span className="font-pixel px-rise flex items-center gap-1.5 text-[9px] uppercase text-green px-glow" role="status">
-            <PixelIcon name="verify" size={12} />
-            Saved ✓
+          <span className="animate-rise flex items-center gap-1.5 text-xs text-green" role="status">
+            <Icon name="verify" size={13} />
+            Saved
           </span>
         )}
-        {!flash && !dirty && <span className="text-sm text-faint">Blank fields are not stored.</span>}
+        {!flash && !dirty && <span className="text-xs text-faint">Blank fields are not stored.</span>}
       </div>
     </form>
   );

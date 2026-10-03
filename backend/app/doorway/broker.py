@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import secrets
 import statistics
@@ -30,6 +31,9 @@ log = logging.getLogger(__name__)
 
 HEAL_TIMEOUT = 60.0  # seconds a call waits for a sandbox to repair its tool
 HEAL_POLL = 0.5
+# Serverless hosts (Vercel) have no browser: calls there run the api strategy only, and
+# form/browser strategies run in the sandboxes (which also heal a broken api strategy).
+HAS_BROWSER = not os.environ.get("VERCEL") and os.environ.get("DOORWAY_BROWSER") != "0"
 ACTION_PRICE_CENTS = 50  # Stripe's card minimum for Shared Payment Tokens
 STATS_WINDOW = 50  # runs behind a tool's success_rate / p50_ms
 # Tools that run. "repairing": the preferred strategy broke but a fallback still works.
@@ -205,9 +209,14 @@ async def run_tool(
 
 
 async def _execute(tool: dict, args: dict, site: dict) -> ExecResult:
+    spec = tool["spec"]
     try:
+        if not HAS_BROWSER:
+            if "api" not in (spec.get("strategies") or {}):
+                return ExecResult(ok=False, error=f"{tool['name']} needs a browser sandbox")
+            return await executor.execute(spec, args, site["base_url"], strategy="api")
         # strategy=None: the spec's preferred strategy, falling back across the others.
-        return await executor.execute(tool["spec"], args, site["base_url"])
+        return await executor.execute(spec, args, site["base_url"])
     except Exception as error:  # an executor bug must not take the API down
         log.exception("executor failed for tool %s", tool["id"])
         return ExecResult(ok=False, error=f"executor error: {type(error).__name__}")
@@ -215,6 +224,8 @@ async def _execute(tool: dict, args: dict, site: dict) -> ExecResult:
 
 def _fell_back(tool: dict, result: ExecResult) -> bool:
     preferred = (tool.get("spec") or {}).get("preferred")
+    if not HAS_BROWSER:  # api was chosen for us, not a fallback
+        return False
     return bool(preferred) and result.strategy is not None and result.strategy != preferred
 
 

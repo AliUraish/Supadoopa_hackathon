@@ -1,8 +1,5 @@
 // One typed client for the Doorway API (contract: backend/DOORWAY_API.md).
 //
-// NEXT_PUBLIC_DOORWAY_MOCK=1 swaps in lib/doorway/mock.ts: fixtures plus a fake live
-// stream that runs in the browser. Flipping it to 0 needs no code changes.
-//
 // Base URL: DOORWAY_API_URL on the server, NEXT_PUBLIC_DOORWAY_API_URL in the browser.
 // Write actions (🔒) send the Supabase session's access token. When nobody is signed
 // in, the browser quietly starts an anonymous Supabase session so the demo never asks
@@ -11,7 +8,6 @@
 // runs with DOORWAY_DEMO_OPEN=1.
 
 import { createClient } from "@/lib/supabase/client";
-import { mockApi, mockBus } from "@/lib/doorway/mock";
 import { supabaseBus } from "@/lib/doorway/bus";
 import { DoorwayError, parseDetail } from "@/lib/doorway/errors";
 import type {
@@ -42,8 +38,6 @@ import type {
 export * from "@/lib/doorway/types";
 export { DoorwayError, describeError } from "@/lib/doorway/errors";
 
-export const DOORWAY_MOCK = process.env.NEXT_PUBLIC_DOORWAY_MOCK === "1";
-
 export function doorwayBaseUrl(): string {
   const url =
     typeof window === "undefined"
@@ -73,16 +67,36 @@ async function accessToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   if (data.session) return data.session.access_token;
   if (anonFailed) return null;
-  // Nobody signed in: start an invisible anonymous session instead of a login wall.
-  anonSignIn ??= supabase.auth.signInAnonymously().then(({ data: anon, error }) => {
-    anonSignIn = null;
-    if (error || !anon.session) {
+  // Nobody signed in: start an invisible anonymous session instead of a login wall, but only
+  // if the project allows anonymous sign-ins (otherwise Supabase answers 422 every time).
+  anonSignIn ??= anonymousAllowed().then(async (allowed) => {
+    if (!allowed) {
+      anonSignIn = null;
       anonFailed = true;
       return null;
     }
-    return anon.session.access_token;
+    return supabase.auth.signInAnonymously().then(({ data: anon, error }) => {
+      anonSignIn = null;
+      if (error || !anon.session) {
+        anonFailed = true;
+        return null;
+      }
+      return anon.session.access_token;
+    });
   });
   return anonSignIn;
+}
+
+async function anonymousAllowed(): Promise<boolean> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "" },
+    });
+    const settings = (await res.json()) as { external?: { anonymous_users?: boolean } };
+    return Boolean(settings.external?.anonymous_users);
+  } catch {
+    return false;
+  }
 }
 
 // ── HTTP implementation ────────────────────────────────────────────────────
@@ -129,6 +143,19 @@ const qs = (params: Record<string, string | number | undefined | null>) => {
 
 const enc = encodeURIComponent;
 
+// A sandbox that stopped heartbeating (e.g. its Compute service was shut down) still has its
+// last row in Postgres; show it as offline instead of idle or busy.
+const STALE_HEARTBEAT_MS = 60_000;
+
+function markStale(list: Sandbox[]): Sandbox[] {
+  const now = Date.now();
+  return list.map((s) =>
+    s.status !== "offline" && (!s.last_heartbeat || now - Date.parse(s.last_heartbeat) > STALE_HEARTBEAT_MS)
+      ? { ...s, status: "offline", current_job_id: null, job_kind: null }
+      : s,
+  );
+}
+
 export const httpApi: DoorwayApi = {
   metrics: () => http<Metrics>("/doorway/metrics"),
   sites: () => http<Site[]>("/doorway/sites"),
@@ -136,7 +163,7 @@ export const httpApi: DoorwayApi = {
   tools: (siteId) => http<Tool[]>(`/doorway/tools${qs({ site_id: siteId })}`),
   tool: (id) => http<ToolDetail>(`/doorway/tools/${id}`),
   graph: () => http<Graph>("/doorway/graph"),
-  sandboxes: () => http<Sandbox[]>("/doorway/sandboxes"),
+  sandboxes: () => http<Sandbox[]>("/doorway/sandboxes").then(markStale),
   jobs: (status?: JobStatus) => http<Job[]>(`/doorway/jobs${qs({ status })}`),
   patterns: () => http<Pattern[]>("/doorway/patterns"),
   messages: (since) => http<Message[]>(`/doorway/messages${qs({ since })}`),
@@ -162,13 +189,12 @@ export const httpApi: DoorwayApi = {
   getRequest: (id) => http<AgentRequest>(`/doorway/requests/${enc(id)}`),
 };
 
-export const doorway: DoorwayApi = DOORWAY_MOCK ? mockApi : httpApi;
+export const doorway: DoorwayApi = httpApi;
 
-// The live sandbox view always comes from the real backend, even in mock mode:
-// it streams the actual Supabase Compute workers.
+// The Supabase Compute page that streams every sandbox's browser.
 export const fetchLiveView = () => http<LiveView>("/doorway/live");
 
-// Push channel for live views: the mock stream, or Supabase Realtime.
+// Push channel for live views: Supabase Realtime.
 export function liveBus(): LiveBus {
-  return DOORWAY_MOCK ? mockBus : supabaseBus();
+  return supabaseBus();
 }

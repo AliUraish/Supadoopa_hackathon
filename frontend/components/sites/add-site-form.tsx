@@ -58,7 +58,11 @@ export function AddSiteForm({ onAdded }: { onAdded: (added: SiteAdded) => void }
   const err = add.error === undefined ? null : addError(add.error);
 
   return (
-    <Panel title="Add a website" icon="plus">
+    <Panel
+      title="Add website"
+      icon="plus"
+      actions={<span className="hidden text-xs text-faint sm:inline">Discover, then verify in a separate sandbox</span>}
+    >
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div className="grid items-end gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,2fr)_auto]">
           <Field label="Website URL" required>
@@ -67,14 +71,15 @@ export function AddSiteForm({ onAdded }: { onAdded: (added: SiteAdded) => void }
               required
               value={url}
               onChange={edit(setUrl)}
-              placeholder="https://"
+              placeholder="https://example.com"
               autoComplete="url"
               inputMode="url"
               disabled={add.pending}
+              className="font-mono"
             />
           </Field>
           <Field label="Name">
-            <Input value={name} onChange={edit(setName)} placeholder="optional" disabled={add.pending} />
+            <Input value={name} onChange={edit(setName)} placeholder="Optional" disabled={add.pending} />
           </Field>
           <Field label="Goal">
             <Input
@@ -84,13 +89,13 @@ export function AddSiteForm({ onAdded }: { onAdded: (added: SiteAdded) => void }
               disabled={add.pending}
             />
           </Field>
-          <Button type="submit" icon="discover" loading={add.pending} className="md:mb-[2px]">
+          <Button type="submit" icon="discover" loading={add.pending}>
             {add.pending ? "Adding" : "Discover"}
           </Button>
         </div>
-        <p className="text-sm text-faint">
-          A sandbox explores the site, compiles each capability into a tool, and a different sandbox
-          verifies it before it&apos;s published.
+        <p className="text-xs text-faint">
+          A sandbox explores the site and compiles each capability into a tool; a different sandbox verifies it
+          before it&apos;s published.
         </p>
         {err && (
           <Banner tone="bad" title={err.title}>

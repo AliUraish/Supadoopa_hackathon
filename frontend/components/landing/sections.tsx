@@ -1,180 +1,342 @@
-// Landing sections (static): the pipeline, the three strategies, the shared brain, pricing.
+// Landing sections below the hero: how it works, strategies, shared memory, pricing,
+// live numbers, connect, footer. Static copy here; live data lives in ./live.
 
-import type { CSSProperties } from "react";
-import { PIPELINE, STAGE_LABEL, TONE_COLOR, type Stage, type Tone } from "@/lib/doorway/format";
-import type { Strategy } from "@/lib/doorway/types";
-import { PixelIcon, type IconName } from "@/components/px/icons";
-import { Sprite } from "@/components/px/sprite";
-import { Meter, Panel } from "@/components/px/ui";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { PIPELINE, STAGE_LABEL, type Stage } from "@/lib/doorway/format";
+import { DoorwayLogo } from "@/components/brand/doorway-logo";
+import { SupabaseLogo } from "@/components/brand/supabase-logo";
+import { ConnectAgent } from "@/components/connect-agent";
+import { Icon, type IconName } from "@/components/px/icons";
+import { Badge, ButtonLink, StatusDot } from "@/components/px/ui";
+import { LiveNumbers, StrategyGrid } from "./live";
+import { Reveal } from "./reveal";
 
-const STEP: Record<Stage, { icon: IconName; tone: Tone; line: string }> = {
-  request: { icon: "request", tone: "info", line: "An agent asks for a site and a task." },
-  lookup: { icon: "lookup", tone: "info", line: "A verified tool already exists? Use it." },
-  discover: { icon: "discover", tone: "info", line: "A sandbox explores the site in Chromium." },
-  observe: { icon: "observe", tone: "violet", line: "Records forms, fields and network calls." },
-  compile: { icon: "compile", tone: "violet", line: "Builds a typed tool, or reuses a pattern." },
-  verify: { icon: "verify", tone: "ok", line: "A different sandbox replays it with test data." },
-  publish: { icon: "publish", tone: "ok", line: "Listed over MCP; fastest strategy wins." },
-  execute: { icon: "execute", tone: "ok", line: "Agents call it like any other tool." },
-  pay: { icon: "coin", tone: "gold", line: "Actions settle via Stripe MPP." },
-  heal: { icon: "heal", tone: "warn", line: "Site changed? Broken → repairing → verified." },
+function Section({
+  id,
+  overline,
+  title,
+  lead,
+  children,
+}: {
+  id?: string;
+  overline: string;
+  title: string;
+  lead?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-16 border-t border-line">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-16 lg:py-20">
+        <Reveal className="flex max-w-2xl flex-col gap-3">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-faint">{overline}</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-text sm:text-3xl">{title}</h2>
+          {lead && <p className="text-[15px] leading-relaxed text-muted">{lead}</p>}
+        </Reveal>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// ── How it works ───────────────────────────────────────────────────────────
+
+const STEP: Record<Stage, { icon: IconName; line: string }> = {
+  request: { icon: "request", line: "An agent asks for a site and a task." },
+  lookup: { icon: "lookup", line: "If a verified tool already exists, it is used." },
+  discover: { icon: "discover", line: "A sandbox explores the site in Chromium." },
+  observe: { icon: "observe", line: "Forms, fields and network calls are recorded." },
+  compile: { icon: "compile", line: "A typed tool is built, or a known pattern reused." },
+  verify: { icon: "verify", line: "A different sandbox replays it with test data." },
+  publish: { icon: "publish", line: "Listed over MCP; the fastest passing strategy wins." },
+  execute: { icon: "execute", line: "Agents call it like any other tool." },
+  pay: { icon: "coin", line: "Actions settle per call via Stripe MPP." },
+  heal: { icon: "heal", line: "When the site changes, the tool is repaired and re-verified." },
 };
 
-export function PipelineStrip() {
+export function HowItWorks() {
   return (
-    <Panel
-      title="The pipeline"
-      icon="request"
-      actions={<span className="hidden text-base text-faint sm:inline">each step is a live event on the dashboard</span>}
+    <Section
+      id="how"
+      overline="How it works"
+      title="From a URL to a tool in ten steps"
+      lead="Every step is a row in Postgres and an event on the dashboard, so you can watch a site become a tool."
     >
-      <span aria-hidden className="px-wire mb-3 block h-[2px] w-full" />
-      <ol className="grid grid-cols-2 gap-3 sm:grid-cols-5 2xl:grid-cols-10">
-        {PIPELINE.map((stage, i) => {
-          const { icon, tone, line } = STEP[stage];
-          const color = TONE_COLOR[tone];
-          return (
-            <li
-              key={stage}
-              className="px-inset flex flex-col gap-1.5 p-2.5"
-              style={{ "--frame": `color-mix(in srgb, ${color} 45%, transparent)` } as CSSProperties}
-            >
+      <Reveal>
+        <ol className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
+          {PIPELINE.map((stage, i) => (
+            <li key={stage} className="flex flex-col gap-2 bg-panel p-4">
               <div className="flex items-center justify-between">
-                <span className="font-pixel text-[8px] text-faint">{String(i + 1).padStart(2, "0")}</span>
-                <span style={{ color }}>
-                  <PixelIcon name={icon} size={14} />
-                </span>
+                <span className="font-mono text-[11px] tabular-nums text-faint">{String(i + 1).padStart(2, "0")}</span>
+                <Icon name={STEP[stage].icon} size={15} className="text-green" />
               </div>
-              <div className="font-pixel text-[9px] uppercase" style={{ color }}>
-                {STAGE_LABEL[stage]}
-              </div>
-              <p className="text-sm text-muted">{line}</p>
+              <div className="text-[13px] font-medium text-text">{STAGE_LABEL[stage]}</div>
+              <p className="text-xs leading-relaxed text-muted">{STEP[stage].line}</p>
             </li>
-          );
-        })}
-      </ol>
-    </Panel>
+          ))}
+        </ol>
+      </Reveal>
+    </Section>
   );
 }
 
-const STRATEGY_INFO: { id: Strategy; latency: string; ms: number; tone: Tone; line: string }[] = [
-  { id: "api", latency: "~50–150 ms", ms: 150, tone: "ok", line: "Replays the site's own private JSON call, found while exploring." },
-  { id: "form", latency: "~0.5–1 s", ms: 1000, tone: "info", line: "Submits the HTML form directly. No browser needed." },
-  { id: "browser", latency: "~3–6 s", ms: 6000, tone: "warn", line: "Clicks through with headless Chromium. The fallback." },
-];
+// ── Strategies ─────────────────────────────────────────────────────────────
 
-export function Strategies({ className }: { className?: string }) {
+export function Strategies() {
   return (
-    <Panel title="Three ways to run a tool" icon="bolt" className={className}>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {STRATEGY_INFO.map((s) => (
-          <div key={s.id} className="px-inset flex flex-col gap-2 p-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="font-pixel text-[11px] uppercase" style={{ color: TONE_COLOR[s.tone] }}>
-                {s.id}
-              </span>
-              <span className="text-lg text-text">{s.latency}</span>
-            </div>
-            <Meter value={s.ms} max={6000} segments={24} tone={s.tone} />
-            <p className="text-base text-muted">{s.line}</p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-3 text-base text-faint">
-        <span className="text-green">▸</span> When a tool is verified the optimizer tries all three and keeps the
-        fastest one that passes. If the site changes, it falls back and heals.
-      </p>
-    </Panel>
+    <Section
+      overline="Execution"
+      title="Three ways to run a tool"
+      lead="Once a tool is verified, the optimizer tries every strategy it can and keeps the fastest one that passes. If the site changes, it falls back and heals."
+    >
+      <Reveal>
+        <StrategyGrid />
+      </Reveal>
+    </Section>
   );
 }
 
-const BRAIN: { icon: IconName; title: string; line: string }[] = [
+// ── Shared memory ──────────────────────────────────────────────────────────
+
+const MEMORY: { icon: IconName; title: string; table: string; line: string }[] = [
   {
     icon: "sandbox",
     title: "Job queue",
-    line: "discover · verify · heal · optimize · race, claimed with FOR UPDATE SKIP LOCKED. Verify always runs on a different sandbox.",
+    table: "doorway_jobs",
+    line: "Discover, verify, heal and optimize jobs, claimed with FOR UPDATE SKIP LOCKED. Verification always runs on a different sandbox.",
   },
   {
     icon: "pattern",
     title: "Patterns",
-    line: "slot_booking (list slots → book with name + phone) is learned once; other booking sites reuse it.",
+    table: "doorway_patterns",
+    line: "A flow learned once, like listing slots and booking one, is reused on the next site that looks the same.",
   },
   {
     icon: "message",
     title: "Message board",
-    line: "hello · tool_published · pattern_published · need_tool · validated · broken.",
+    table: "doorway_messages",
+    line: "Sandboxes announce published tools, broken tools and requests for help.",
   },
-  { icon: "graph", title: "Realtime", line: "Every row streams to the dashboard as it happens." },
+  {
+    icon: "live",
+    title: "Realtime",
+    table: "supabase_realtime",
+    line: "Every insert and update streams to the dashboard as it happens.",
+  },
 ];
 
-export function SharedBrain({ className }: { className?: string }) {
+function MemoryDiagram() {
   return (
-    <Panel title="Sandboxes share one brain" icon="database" className={className}>
-      <div className="flex flex-col gap-4">
-        <p className="text-base text-muted">
-          Isolated Chromium workers on <span className="text-text">Supabase Compute</span>. They coordinate only
-          through one Postgres:
-        </p>
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-2">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="flex items-center gap-2">
-                <Sprite name="sandbox" scale={2} />
-                <span className="font-pixel text-[7px] uppercase text-faint">sandbox-{n}</span>
-              </div>
-            ))}
-          </div>
-          <div aria-hidden className="flex flex-1 flex-col justify-around gap-7 self-stretch py-3">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="px-wire block h-[2px] w-full" style={{ animationDelay: `${i * 0.2}s` }} />
-            ))}
-          </div>
-          <div className="flex flex-col items-center gap-1.5">
-            <Sprite name="database" scale={4} className="drop-shadow-[0_0_10px_rgba(62,207,142,0.5)]" />
-            <span className="font-pixel text-[7px] uppercase text-green">postgres</span>
+    <div className="px-panel flex flex-col gap-5 p-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)] items-center">
+        <div className="flex flex-col gap-2">
+          <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-faint">
+            <SupabaseLogo size={11} />
+            Compute
+          </span>
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="flex items-center gap-2 rounded-md border border-line bg-panel-2 px-3 py-2">
+              <Icon name="sandbox" size={14} className="text-muted" />
+              <span className="truncate font-mono text-xs text-text">sandbox-{n}</span>
+              <StatusDot tone="ok" size={6} pulse={false} className="ml-auto" />
+            </div>
+          ))}
+        </div>
+        <svg viewBox="0 0 48 120" className="h-[120px] w-full self-end" aria-hidden preserveAspectRatio="none">
+          {[20, 60, 100].map((y) => (
+            <path key={y} d={`M0 ${y} C24 ${y} 24 60 48 60`} fill="none" stroke="#363636" strokeWidth="1" />
+          ))}
+        </svg>
+        <div className="flex flex-col items-center gap-3 self-end rounded-lg border border-line bg-panel-2 px-4 py-5">
+          <SupabaseLogo size={34} />
+          <div className="text-center">
+            <div className="text-[13px] font-medium text-text">Postgres</div>
+            <div className="text-xs text-faint">one shared database</div>
           </div>
         </div>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {BRAIN.map((b) => (
-            <li key={b.title} className="flex gap-2">
-              <PixelIcon name={b.icon} size={14} className="mt-1 shrink-0 text-green" />
-              <div>
-                <div className="font-pixel text-[8px] uppercase text-text">{b.title}</div>
-                <p className="text-sm text-muted">{b.line}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
       </div>
-    </Panel>
+      <div className="flex flex-wrap gap-1.5 border-t border-line pt-4">
+        {MEMORY.map((m) => (
+          <span key={m.table} className="rounded border border-line bg-bg px-1.5 py-0.5 font-mono text-[11px] text-muted">
+            {m.table}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
-export function PayPerCall({ className }: { className?: string }) {
+export function SharedMemory() {
   return (
-    <Panel title="Pay per call" icon="coin" tone="gold" className={className}>
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-4">
-          <Sprite name="coin" scale={5} className="drop-shadow-[0_0_10px_rgba(247,208,70,0.45)]" />
-          <div>
-            <div className="font-pixel text-[24px] leading-none text-gold">$0.50</div>
-            <div className="mt-1 text-base text-muted">per successful action call</div>
-          </div>
-        </div>
-        <ul className="flex flex-col gap-1 text-base text-muted">
-          <li>
-            <span className="text-gold">▸</span> Actions (book, reserve) settle via <span className="text-text">Stripe MPP</span>
-          </li>
-          <li>
-            <span className="text-gold">▸</span> HTTP <code className="text-text">402</code> → pay → retry, no account needed
-          </li>
-          <li>
-            <span className="text-gold">▸</span> Reads (list slots, search) are <span className="text-green">free</span>
-          </li>
-          <li>
-            <span className="text-gold">▸</span> Everything runs in Stripe test mode
-          </li>
-        </ul>
+    <Section
+      overline="Coordination"
+      title="Sandboxes share one memory"
+      lead="Each discovery, verification and repair runs in an isolated Chromium worker on Supabase Compute. Workers never talk to each other directly: they coordinate through one Postgres database."
+    >
+      <div className="grid items-start gap-8 lg:grid-cols-2">
+        <Reveal>
+          <ul className="flex flex-col gap-5">
+            {MEMORY.map((m) => (
+              <li key={m.title} className="flex gap-3">
+                <span className="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-panel text-green">
+                  <Icon name={m.icon} size={15} />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-text">{m.title}</div>
+                  <p className="text-[13px] leading-relaxed text-muted">{m.line}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <MemoryDiagram />
+        </Reveal>
       </div>
-    </Panel>
+    </Section>
+  );
+}
+
+// ── Pay per call ───────────────────────────────────────────────────────────
+
+const FLOW: { dir: string; text: string; status: string; tone: "warn" | "gold" | "ok" }[] = [
+  { dir: "→", text: "POST /doorway/run/sunrise-clinic/book_appointment", status: "402", tone: "warn" },
+  { dir: "→", text: "Pay $0.50 with Stripe MPP", status: "paid", tone: "gold" },
+  { dir: "→", text: "Retry with the payment credential", status: "200", tone: "ok" },
+  { dir: "→", text: "POST /doorway/run/sunrise-clinic/list_slots", status: "free", tone: "ok" },
+];
+
+export function PayPerCall() {
+  return (
+    <Section
+      overline="Pricing"
+      title="Pay per call"
+      lead="Agents need no plan and no account. Actions that change something settle per call over Stripe MPP; reads are free."
+    >
+      <div className="grid items-start gap-8 lg:grid-cols-2">
+        <Reveal className="flex flex-col gap-6">
+          <div className="flex items-baseline gap-3">
+            <span className="text-5xl font-semibold tracking-tight tabular-nums text-text">$0.50</span>
+            <span className="text-[13px] text-muted">per successful action call</span>
+          </div>
+          <ul className="flex flex-col gap-2.5 text-[13px] text-muted">
+            {[
+              "Actions such as booking or reserving return HTTP 402 until paid",
+              "Reads such as listing slots or searching are free",
+              "Failed calls are never charged",
+              "Runs in Stripe test mode",
+            ].map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <Icon name="verify" size={14} className="mt-0.5 shrink-0 text-green" />
+                {line}
+              </li>
+            ))}
+          </ul>
+          <Link href="/pricing" className="inline-flex w-fit items-center gap-1 text-[13px] text-green hover:text-green-hi">
+            See plans
+            <Icon name="chevron" size={14} />
+          </Link>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <div className="px-panel overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-line px-4 py-2.5 text-[13px] font-medium text-text">
+              <Icon name="coin" size={15} className="text-muted" />
+              One paid call
+            </div>
+            <ol className="flex flex-col">
+              {FLOW.map((step, i) => (
+                <li
+                  key={step.text}
+                  className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0"
+                >
+                  <span className="font-mono text-[11px] tabular-nums text-faint">{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-text">{step.text}</span>
+                  <Badge tone={step.tone} className="font-mono normal-case">
+                    {step.status}
+                  </Badge>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </Reveal>
+      </div>
+    </Section>
+  );
+}
+
+// ── Live numbers ───────────────────────────────────────────────────────────
+
+export function Numbers() {
+  return (
+    <Section overline="Right now" title="Live numbers">
+      <Reveal>
+        <LiveNumbers />
+      </Reveal>
+    </Section>
+  );
+}
+
+// ── Connect ────────────────────────────────────────────────────────────────
+
+export function Connect() {
+  return (
+    <Section
+      id="connect"
+      overline="Connect"
+      title="Connect your agent"
+      lead="One MCP server for every verified tool. Add it to Claude Code, or pick individual tools to install from the dashboard."
+    >
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Reveal>
+          <ConnectAgent />
+        </Reveal>
+        <Reveal delay={0.08} className="px-panel flex flex-col gap-3 p-5">
+          <div className="text-[13px] font-medium text-text">Prefer to choose?</div>
+          <p className="text-[13px] text-muted">
+            Browse the verified tools for each website and install only the ones your agent needs.
+          </p>
+          <ButtonLink href="/dashboard?tab=install" variant="ghost" icon="tool" className="w-fit">
+            Install tools
+          </ButtonLink>
+        </Reveal>
+      </div>
+    </Section>
+  );
+}
+
+// ── Footer ─────────────────────────────────────────────────────────────────
+
+const FOOTER_LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard?tab=install", label: "Install tools" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/profile", label: "Saved details" },
+  { href: "/login", label: "Sign in" },
+];
+
+export function LandingFooter() {
+  return (
+    <footer className="border-t border-line">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-4 px-6 py-8">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Link href="/" aria-label="Doorway home">
+            <DoorwayLogo />
+          </Link>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted" aria-label="Footer">
+            {FOOTER_LINKS.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-text">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-faint">
+          <SupabaseLogo size={13} />
+          <span>Supabase Postgres, Realtime and Compute</span>
+          <span aria-hidden>·</span>
+          <span>Stripe test mode</span>
+        </div>
+      </div>
+    </footer>
   );
 }

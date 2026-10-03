@@ -298,7 +298,7 @@ async def _publish(
         r = by_name.get(spec["name"])
         if r is None or not r.passed:
             continue
-        spec = normalize(spec)
+        spec = _passing_only(normalize(spec), r)
         tool = await store.find_tool(site["id"], spec["name"]) or await store.upsert_tool(
             _tool_row(site, spec, caps, (pattern_roles or {}).get(spec["name"]))
         )
@@ -325,6 +325,16 @@ async def _publish(
         )
         published.append({**tool, "version": version["version"]})
     return published
+
+
+def _passing_only(spec: dict, result: VerifyResult) -> dict:
+    """Drop strategies verify saw fail (e.g. overfit to the example); prefer a passing one."""
+    failed = {s for s, v in result.by_strategy.items() if not v.get("passed")}
+    kept = {s: v for s, v in spec["strategies"].items() if s not in failed}
+    if not kept or not failed:
+        return spec
+    preferred = spec["preferred"] if spec["preferred"] in kept else result.strategy
+    return {**spec, "strategies": kept, "preferred": preferred or next(iter(kept))}
 
 
 def _price(spec: dict) -> int:

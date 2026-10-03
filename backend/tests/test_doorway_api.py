@@ -376,6 +376,30 @@ def test_broken_tool_is_healed_and_retried(client, clinic, signed_in, site, stor
     assert client.get("/doorway/metrics").json()["heals"] == 1
 
 
+def test_without_a_browser_calls_run_api_only_and_heal_in_a_sandbox(
+    client, clinic, signed_in, site, store, monkeypatch
+):
+    # On Vercel there is no browser: a broken api strategy must go to a sandbox heal job,
+    # never to a form/browser fallback inside the API.
+    monkeypatch.setattr(broker, "HAS_BROWSER", False)
+    strategies = []
+    execute = site.execute
+
+    async def spy(spec, inputs, base_url, *, strategy=None, browser=None):
+        strategies.append(strategy)
+        return await execute(spec, inputs, base_url, strategy=strategy, browser=browser)
+
+    monkeypatch.setattr(executor, "execute", spy)
+    worker_heals(store, monkeypatch)
+    monkeypatch.setattr(broker, "HEAL_POLL", 0.01)
+    site.version = "v2"
+
+    body = client.post(f"/doorway/tools/{clinic.list_id}/run", json={"arguments": {}}).json()
+    assert body["ok"] and body["healed"] is True
+    assert strategies == ["api", "api"]
+    assert [j["kind"] for j in store.tables["doorway_jobs"].values()] == ["heal"]
+
+
 def test_fallback_success_repairs_the_fast_path_in_the_background(client, clinic, site, store):
     site.fallback = True
     response = client.post(f"/doorway/run/{SITE}/list_open_slots", json={})

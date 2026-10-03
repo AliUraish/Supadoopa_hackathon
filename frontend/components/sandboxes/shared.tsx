@@ -1,11 +1,14 @@
+"use client";
+
 // Small shared pieces for the Sandboxes tab: per-sandbox colours, job-kind styling,
-// durations, site links and the "just arrived" flash.
+// durations, site links and the row-enter animation.
 
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { describeError, type JobKind } from "@/lib/doorway";
 import type { Tone } from "@/lib/doorway/format";
-import { PixelIcon, type IconName } from "@/components/px/icons";
+import { Icon, type IconName } from "@/components/px/icons";
 import { cx } from "@/components/px/ui";
 
 export const JOB_KIND_STYLE: Record<JobKind, { icon: IconName; tone: Tone }> = {
@@ -22,15 +25,15 @@ export function jobKindStyle(kind: string | null | undefined) {
   return (kind && JOB_KIND_STYLE[kind as JobKind]) || UNKNOWN_KIND;
 }
 
-// Each sandbox keeps one colour everywhere (cards, board, queue, patterns) so it can be
+// Each sandbox keeps one colour everywhere (a small dot next to its name) so it can be
 // followed across the screen. sandbox-1 → blue, sandbox-2 → violet, …
 const SANDBOX_COLORS = [
   "var(--color-blue)",
   "var(--color-violet)",
   "var(--color-gold)",
   "var(--color-green-hi)",
-  "#ff9ecf",
-  "#6ee7f9",
+  "#f0a6ca",
+  "#7dd3fc",
 ];
 
 export function sandboxColor(id: string | null | undefined): string {
@@ -78,16 +81,30 @@ export function fmtDuration(ms: number | null | undefined): string {
   return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
-/** Ref callback: flash a row green once when it mounts (stable identity → runs once). */
-export function flashOnMount(el: HTMLElement | null) {
-  if (!el || typeof el.animate !== "function") return;
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-  el.animate(
-    [
-      { backgroundColor: "rgba(62, 207, 142, 0.28)", boxShadow: "inset 3px 0 0 0 #3ecf8e" },
-      { backgroundColor: "rgba(62, 207, 142, 0)", boxShadow: "inset 3px 0 0 0 rgba(62, 207, 142, 0)" },
-    ],
-    { duration: 2400, easing: "steps(8, end)" },
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** A list row that fades in and rises 8px when it first appears (wrap lists in
+ *  <AnimatePresence initial={false}> so only rows added later animate). */
+export function RiseItem({
+  children,
+  className,
+  title,
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.li
+      initial={reduce ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: EASE }}
+      className={className}
+      title={title}
+    >
+      {children}
+    </motion.li>
   );
 }
 
@@ -100,10 +117,11 @@ export function SandboxName({
   fallback?: string;
   className?: string;
 }) {
-  if (!id) return <span className={cx("text-muted", className)}>{fallback}</span>;
+  if (!id) return <span className={cx("font-mono text-muted", className)}>{fallback}</span>;
   return (
-    <span className={className} style={{ color: sandboxColor(id) }}>
-      {id}
+    <span className={cx("inline-flex min-w-0 items-center gap-1.5 font-mono text-text", className)}>
+      <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: sandboxColor(id) }} />
+      <span className="truncate">{id}</span>
     </span>
   );
 }
@@ -119,17 +137,18 @@ export function SiteLink({ id, className }: { id: string; className?: string }) 
   );
 }
 
-/** Framed site chip (patterns). `origin` marks the site a pattern was learned on. */
+/** Site pill (patterns). `origin` marks the site a pattern was learned on. */
 export function SiteChip({ id, origin }: { id: string; origin?: boolean }) {
-  const frame = origin ? "var(--color-violet)" : "var(--color-line-2)";
   return (
     <Link
       href={`/sites/${encodeURIComponent(id)}`}
       title={origin ? `Learned on ${id}` : `Reused on ${id}`}
-      className="px-frame inline-flex items-center gap-1 bg-bg-2 px-1.5 text-sm leading-6 text-text hover:text-green"
-      style={{ "--frame": frame } as CSSProperties}
+      className={cx(
+        "inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-xs transition-colors hover:text-green",
+        origin ? "border-green-dim/50 bg-green/10 text-text" : "border-line bg-panel-2 text-muted hover:border-line-2",
+      )}
     >
-      <PixelIcon name="site" size={9} className={origin ? "text-violet" : "text-faint"} />
+      <Icon name="site" size={12} className={origin ? "text-green" : "text-faint"} />
       {id}
     </Link>
   );
@@ -139,8 +158,8 @@ export function SiteChip({ id, origin }: { id: string; origin?: boolean }) {
 export function StaleNote({ error, className }: { error: unknown; className?: string }) {
   if (!error) return null;
   return (
-    <p className={cx("flex items-center gap-1.5 text-sm text-amber", className)} role="status">
-      <PixelIcon name="warn" size={10} className="shrink-0" />
+    <p className={cx("flex items-center gap-1.5 text-xs text-amber", className)} role="status">
+      <Icon name="warn" size={13} className="shrink-0" />
       <span className="min-w-0 truncate">Showing last known state · {describeError(error)}</span>
     </p>
   );
@@ -149,8 +168,8 @@ export function StaleNote({ error, className }: { error: unknown; className?: st
 /** A thin explanatory band under a panel header. */
 export function PanelNote({ icon, children }: { icon?: IconName; children: ReactNode }) {
   return (
-    <p className="-mx-3 -mt-3 mb-3 flex items-start gap-2 border-b-2 border-line bg-bg-2 px-3 py-1.5 text-base leading-tight text-muted">
-      {icon && <PixelIcon name={icon} size={12} className="mt-0.5 shrink-0 text-green" />}
+    <p className="-mx-4 -mt-4 mb-4 flex items-start gap-2 border-b border-line bg-panel-2 px-4 py-2 text-xs leading-relaxed text-muted">
+      {icon && <Icon name={icon} size={13} className="mt-0.5 shrink-0 text-faint" />}
       <span>{children}</span>
     </p>
   );

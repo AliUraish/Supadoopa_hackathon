@@ -205,10 +205,12 @@ async def test_all_three_strategies_verify_and_api_is_fastest(clinic, browser):
         }, r.by_strategy  # fmt: skip
         page_ms = min(r.by_strategy["form"]["ms"], r.by_strategy["browser"]["ms"])
         assert r.by_strategy["api"]["ms"] < page_ms, r.by_strategy
-    # Every strategy booked its own fresh slot (the producer was re-run between them).
+    # Every strategy booked its own fresh slot (the producer was re-run between them), and
+    # each page strategy also booked the second listed slot (the not-overfit check).
     booked = (await admin(clinic, "GET", "state"))["bookings"]
     assert sorted(b["slotId"] for b in booked) == [
         "khan-2026-12-01-0900", "khan-2026-12-01-0930", "khan-2026-12-01-1000",
+        "khan-2026-12-01-1100", "khan-2026-12-01-1130",
     ]  # fmt: skip
     form = await executor.execute(LIST_SLOTS, {"doctor_id": "khan", "date": "2026-12-01"}, clinic,
                                   strategy="form")  # fmt: skip
@@ -299,3 +301,126 @@ async def test_benchmark_reports_p50_per_strategy(clinic, browser):
     assert all(v["passed"] for v in actions.values()), actions
     assert actions["api"]["p50_ms"] < min(actions["form"]["p50_ms"], actions["browser"]["p50_ms"])
     assert len((await admin(clinic, "GET", "state"))["bookings"]) == 6
+
+
+# --- a tiny library page (results render late; holds by book id) ------------------------
+
+LIBRARY_HTML = b"""<!doctype html><html><body>
+<input id="q"><button id="search">Search</button>
+<p id="results-msg">Search the catalog</p><div id="books"></div><p id="hold-msg"></p>
+<script>
+const BOOKS = [{id: "b1", title: "Jane Eyre"}, {id: "b2", title: "Moby Dick"}];
+document.getElementById("search").onclick = () => setTimeout(() => {
+  const q = document.getElementById("q").value.toLowerCase();
+  const box = document.getElementById("books");
+  box.innerHTML = "";
+  for (const b of BOOKS.filter((b) => b.title.toLowerCase().includes(q))) {
+    const btn = document.createElement("button");
+    btn.dataset.id = b.id; btn.textContent = b.title;
+    btn.onclick = () => { document.getElementById("hold-msg").textContent = "Held " + b.id; };
+    box.appendChild(btn);
+  }
+}, 400);
+</script></body></html>"""
+
+
+@pytest.fixture(scope="module")
+def library():
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def _send(self, body: bytes, kind: str, status: int = 200) -> None:
+            self.send_response(status)
+            self.send_header("content-type", kind)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):  # noqa: N802
+            if self.path.startswith("/api/books"):
+                books = [{"id": "b1", "title": "Jane Eyre"}, {"id": "b2", "title": "Moby Dick"}]
+                return self._send(json.dumps(books).encode(), "application/json")
+            self._send(LIBRARY_HTML, "text/html")
+
+        def do_POST(self):  # noqa: N802
+            body = json.loads(self.rfile.read(int(self.headers["content-length"])) or b"{}")
+            self._send(json.dumps({"held": body["book_id"]}).encode(), "application/json")
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}/"
+    server.shutdown()
+
+
+def _book_tool(name: str, steps: list[dict], result: dict, **extra) -> dict:
+    return {
+        "name": name,
+        "description": name,
+        "kind": "read",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+        "strategies": {"browser": {"steps": steps, "result": result}, **extra},
+        "preferred": "browser",
+        "test": {"input": {}},
+    }
+
+
+async def test_many_result_waits_for_rows_after_a_preexisting_wait_element(library, browser):
+    search = _book_tool(
+        "search_books",
+        [{"action": "fill", "selector": "#q", "value": ""},
+         {"action": "click", "selector": "#search"}],
+        {"selector": "#books button[data-id]", "many": True, "wait": "#results-msg",
+         "fields": {"id": "@data-id", "title": "text"}},
+    )  # fmt: skip
+    r = await executor.execute(search, {}, library, browser=browser)
+    assert r.ok and [b["id"] for b in r.data] == ["b1", "b2"], (r.error, r.data)
+
+
+async def test_verify_fails_a_page_strategy_hard_coded_to_the_example(
+    library, browser, monkeypatch
+):
+    monkeypatch.setattr(executor, "ACTION_TIMEOUT_MS", 1_000)
+    list_books = {
+        **_book_tool("list_books", [], {"selector": "#books"}),
+        "strategies": {"api": {"request": {"method": "GET", "path": "api/books"}}},
+        "preferred": "api",
+    }
+
+    def hold_steps(search_text: str) -> list[dict]:
+        return [
+            {"action": "fill", "selector": "#q", "value": search_text},
+            {"action": "click", "selector": "#search"},
+            {"action": "click", "selector": 'button[data-id="{{book_id}}"]'},
+        ]
+
+    hold = {
+        **_book_tool("place_hold", hold_steps(""), {"selector": "#hold-msg"}),
+        "kind": "action",
+        "input_schema": {
+            "type": "object",
+            "properties": {"book_id": {"type": "string"}},
+            "required": ["book_id"],
+        },  # fmt: skip
+        "test": {"input": {"book_id": "{{from:list_books:0.id}}"}},
+    }
+    hold["strategies"] = {
+        "api": {
+            "request": {"method": "POST", "path": "api/hold", "body": {"book_id": "{{book_id}}"}}
+        },  # fmt: skip
+        "form": {"path": "", "fields": hold_steps("Jane"), "result": {"selector": "#hold-msg"}},
+        "browser": hold["strategies"]["browser"],
+    }
+    hold["preferred"] = "form"
+    results = await executor.verify([list_books, hold], library, browser=browser)
+    assert results[0].passed, results[0].error
+    r = results[1]
+    assert r.passed and r.strategy == "api", (r.error, r.by_strategy)
+    assert r.by_strategy["browser"]["passed"], r.by_strategy
+    assert r.by_strategy["form"] == {
+        "passed": False, "ms": r.by_strategy["form"]["ms"],
+        "error": executor.OVERFIT_ERROR, "broken": False,
+    }  # fmt: skip

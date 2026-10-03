@@ -3,6 +3,7 @@
 // Version history and recent runs for one tool.
 
 import type { ReactNode } from "react";
+import { Check, X } from "lucide-react";
 import { STRATEGIES, type Run, type RunMode, type ToolVersion, type VersionSource } from "@/lib/doorway";
 import { clockTime, fmtInt, fmtMs, fmtTokens, type Tone } from "@/lib/doorway/format";
 import { TimeAgo } from "@/components/px/client";
@@ -29,7 +30,7 @@ function Th({ children, right }: { children: ReactNode; right?: boolean }) {
     <th
       scope="col"
       className={cx(
-        "font-pixel whitespace-nowrap px-2 pb-2 text-[8px] font-normal uppercase text-faint",
+        "whitespace-nowrap border-b border-line bg-panel-2 px-3 py-2 font-mono text-[11px] font-normal uppercase tracking-wider text-faint",
         right ? "text-right" : "text-left",
       )}
     >
@@ -42,7 +43,7 @@ function Td({ children, right, className }: { children: ReactNode; right?: boole
   return (
     <td
       className={cx(
-        "whitespace-nowrap border-t border-line/70 px-2 py-1.5 align-middle",
+        "whitespace-nowrap border-b border-line px-3 py-2 align-middle",
         right && "text-right tabular-nums",
         className,
       )}
@@ -61,8 +62,14 @@ function StrategySummary({ strategies }: { strategies: ToolVersion["strategies"]
   return (
     <span className="flex flex-wrap gap-x-2.5">
       {parts.map(({ s, r }) => (
-        <span key={s} className={r.passed ? "text-text" : "text-red"}>
-          <span className="text-muted">{s}</span> {r.ms != null ? fmtMs(r.ms) : ""} {r.passed ? "✓" : "✗"}
+        <span key={s} className={cx("inline-flex items-center gap-1 font-mono text-xs tabular-nums", r.passed ? "text-text" : "text-red")}>
+          <span className="text-faint">{s}</span>
+          {r.ms != null ? fmtMs(r.ms) : ""}
+          {r.passed ? (
+            <Check size={12} strokeWidth={2} className="text-green" aria-label="passed" />
+          ) : (
+            <X size={12} strokeWidth={2} aria-label="failed" />
+          )}
         </span>
       ))}
     </span>
@@ -76,7 +83,7 @@ export function VersionTable({ versions }: { versions: ToolVersion[] }) {
   const rows = [...versions].sort((a, b) => b.version - a.version);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-base">
+      <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr>
             <Th>Ver</Th>
@@ -89,9 +96,10 @@ export function VersionTable({ versions }: { versions: ToolVersion[] }) {
         </thead>
         <tbody>
           {rows.map((v, i) => (
-            <tr key={v.version} className={i === 0 ? "bg-panel-2" : undefined}>
+            <tr key={v.version} className="transition-colors hover:bg-panel-2">
               <Td>
-                <span className={i === 0 ? "text-green" : "text-text"}>v{v.version}</span>
+                <span className={cx("font-mono tabular-nums", i === 0 ? "text-green" : "text-text")}>v{v.version}</span>
+                {i === 0 && <span className="ml-2 text-[11px] text-faint">latest</span>}
               </Td>
               <Td>
                 <Badge status={v.status} />
@@ -102,13 +110,13 @@ export function VersionTable({ versions }: { versions: ToolVersion[] }) {
                 </Badge>
               </Td>
               <Td>
-                <span className="text-violet">{v.verified_by ?? "—"}</span>
+                <span className="font-mono text-xs text-muted">{v.verified_by ?? "—"}</span>
               </Td>
               <Td>
                 <StrategySummary strategies={v.strategies} />
               </Td>
               <Td right>
-                <TimeAgo iso={v.created_at} className="text-muted" />
+                <TimeAgo iso={v.created_at} className="text-xs text-muted" />
               </Td>
             </tr>
           ))}
@@ -125,7 +133,7 @@ export function RunTable({ runs, limit = 25 }: { runs: Run[]; limit?: number }) 
   const rows = [...runs].sort((a, b) => b.id - a.id).slice(0, limit);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-base">
+      <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr>
             <Th>Time</Th>
@@ -141,10 +149,10 @@ export function RunTable({ runs, limit = 25 }: { runs: Run[]; limit?: number }) 
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="px-rise">
+            <tr key={r.id} className="animate-rise transition-colors hover:bg-panel-2">
               <Td>
-                <TimeAgo iso={r.created_at} className="text-muted" />
-                <span className="ml-2 text-sm text-faint">{clockTime(r.created_at)}</span>
+                <TimeAgo iso={r.created_at} className="text-xs text-muted" />
+                <span className="ml-2 font-mono text-[11px] tabular-nums text-faint">{clockTime(r.created_at)}</span>
               </Td>
               <Td>
                 <Badge tone={MODE_TONE[r.mode] ?? "muted"} pulse={false}>
@@ -152,25 +160,25 @@ export function RunTable({ runs, limit = 25 }: { runs: Run[]; limit?: number }) 
                 </Badge>
               </Td>
               <Td>
-                <span className="text-text">{r.strategy ?? "—"}</span>
+                <span className="font-mono text-xs text-text">{r.strategy ?? "—"}</span>
               </Td>
               <Td>
                 {r.status === "success" ? (
-                  <span className="text-green" title="success">
-                    ✓
-                  </span>
+                  <Badge tone="ok" pulse={false}>
+                    Success
+                  </Badge>
                 ) : (
-                  <span className="text-red" title="failure">
-                    ✗
-                  </span>
+                  <Badge tone="bad" pulse={false}>
+                    Failed
+                  </Badge>
                 )}
               </Td>
-              <Td right>{fmtMs(r.ms)}</Td>
-              <Td right>{fmtInt(r.steps)}</Td>
-              <Td right>{fmtTokens(r.tokens)}</Td>
+              <Td right className="font-mono text-xs">{fmtMs(r.ms)}</Td>
+              <Td right className="font-mono text-xs">{fmtInt(r.steps)}</Td>
+              <Td right className="font-mono text-xs">{fmtTokens(r.tokens)}</Td>
               <Td>
                 {r.paid_reference ? (
-                  <CopyText value={r.paid_reference} className="text-gold">
+                  <CopyText value={r.paid_reference} className="font-mono text-xs text-muted">
                     {shortRef(r.paid_reference)}
                   </CopyText>
                 ) : (
@@ -179,7 +187,7 @@ export function RunTable({ runs, limit = 25 }: { runs: Run[]; limit?: number }) 
               </Td>
               <Td className="max-w-[280px]">
                 {r.error ? (
-                  <span className="block truncate text-red" title={r.error}>
+                  <span className="block truncate text-xs text-red" title={r.error}>
                     {r.error}
                   </span>
                 ) : (

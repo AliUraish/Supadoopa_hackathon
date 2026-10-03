@@ -32,13 +32,18 @@ def _text(text: str, *, error: bool = False) -> types.CallToolResult:
     return types.CallToolResult(content=[types.TextContent(text=text)], is_error=error)
 
 
-def _mcp_tool(tool: dict, site_name: str, *, prefixed: bool) -> types.Tool:
+def _mcp_tool(tool: dict, site_name: str, *, prefixed: bool, owner: bool = False) -> types.Tool:
     spec = tool.get("spec") or {}
     schema = dict(spec.get("input_schema") or {})
     schema.setdefault("type", "object")
     schema.setdefault("properties", {})
+    how = (
+        "runs directly, paid automatically in Stripe test mode"
+        if owner
+        else "returns a paymentLink to pay (MPP) and run it"
+    )
     price = (
-        f" Costs ${broker.price_usd(tool)} per call: returns a paymentLink to pay (MPP) and run it."
+        f" Costs ${broker.price_usd(tool)} per call: {how}."
         if tool["kind"] == "action"
         else " Free."
     )
@@ -51,8 +56,12 @@ def _mcp_tool(tool: dict, site_name: str, *, prefixed: bool) -> types.Tool:
     )
 
 
-def build_server(store: DoorwayStore, site_id: str | None = None) -> Server:
-    """An MCP server over the store's verified tools: all sites, or just `site_id`."""
+def build_server(store: DoorwayStore, site_id: str | None = None, *, pay=None) -> Server:
+    """An MCP server over the store's verified tools: all sites, or just `site_id`.
+
+    `pay(tool) -> {"reference", ...}` is set for the owner's own Claude (X-Doorway-Key): action
+    tools then pay themselves (Stripe test mode) and run, instead of returning a paymentLink.
+    """
 
     async def list_tools(_ctx: Any, _params: Any) -> types.ListToolsResult:
         names = {s["id"]: s["name"] for s in await store.list_sites()}
@@ -63,7 +72,12 @@ def build_server(store: DoorwayStore, site_id: str | None = None) -> Server:
         ]
         return types.ListToolsResult(
             tools=[
-                _mcp_tool(t, names.get(t["site_id"], t["site_id"]), prefixed=site_id is None)
+                _mcp_tool(
+                    t,
+                    names.get(t["site_id"], t["site_id"]),
+                    prefixed=site_id is None,
+                    owner=pay is not None,
+                )
                 for t in tools
             ]
         )
@@ -83,6 +97,20 @@ def build_server(store: DoorwayStore, site_id: str | None = None) -> Server:
             return _text(f"Unknown tool {params.name}", error=True)
         if missing := broker.missing_inputs(tool, args):
             return _text(f"Missing required inputs: {', '.join(missing)}", error=True)
+        if tool["kind"] == "action" and pay is not None:
+            try:
+                payment = await pay(tool)
+            except Exception as error:  # noqa: BLE001  (payment problems go back as text)
+                return _text(f"Payment failed: {error}", error=True)
+            outcome = await broker.run_tool(
+                store, tool, args, mode="broker", paid_reference=payment["reference"]
+            )
+            paid = (
+                f"(paid ${broker.price_usd(tool)} in Stripe test mode, ref {payment['reference']})"
+            )
+            if not outcome.ok:
+                return _text(f"Error: {outcome.error} {paid}", error=True)
+            return _text(json.dumps(outcome.data, default=str) + f"\n{paid}")
         if tool["kind"] == "action":
             link = broker.payment_link(tool, args)
             await store.emit(
@@ -113,7 +141,11 @@ def build_server(store: DoorwayStore, site_id: str | None = None) -> Server:
         name,
         version="1.0.0",
         instructions="Verified tools for websites without an API. Reads are free; actions "
-        "return a paymentLink (pay per call with MPP).",
+        + (
+            "run directly and are paid automatically (Stripe test mode)."
+            if pay is not None
+            else "return a paymentLink (pay per call with MPP)."
+        ),
         on_list_tools=list_tools,
         on_call_tool=call_tool,
     )

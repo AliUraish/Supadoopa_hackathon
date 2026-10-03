@@ -109,7 +109,7 @@ export function SchemaForm({
 }) {
   const props = Object.entries(schema.properties ?? {});
   const required = new Set(schema.required ?? []);
-  if (!props.length) return <p className="text-base text-muted">This tool takes no inputs.</p>;
+  if (!props.length) return <p className="text-[13px] text-faint">This tool takes no inputs.</p>;
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -156,14 +156,14 @@ function SchemaField({
       <>
         {prop.description}
         {profileField && (
-          <span className="block text-violet">
-            can autofill from your profile: <code>{profileField}</code>
+          <span className="mt-0.5 flex items-center gap-1 text-violet">
+            Can autofill from your profile: <code className="font-mono">{profileField}</code>
           </span>
         )}
       </>
     ) : undefined;
   const placeholder =
-    useProfile && profileField ? `from profile · ${profileField}` : placeholderFor(prop);
+    useProfile && profileField ? `From profile: ${profileField}` : placeholderFor(prop);
   const text = typeof value === "string" ? value : "";
   const onText = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     onChange(e.target.value);

@@ -1,0 +1,12 @@
+.venv
+.devdb
+tests
+demo_sites
+scripts
+__pycache__
+.pytest_cache
+.ruff_cache
+Dockerfile
+.dockerignore
+.env
+.env.*

@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Press_Start_2P, VT323 } from "next/font/google";
-import { Nav } from "@/components/nav";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const pixel = Press_Start_2P({ weight: "400", subsets: ["latin"], variable: "--font-press-start" });
-const term = VT323({ weight: "400", subsets: ["latin"], variable: "--font-vt323" });
+const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: { default: "Doorway", template: "%s · Doorway" },
@@ -13,11 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${pixel.variable} ${term.variable} h-full`}>
-      <body className="flex min-h-full flex-col">
-        <Nav />
-        {children}
-      </body>
+    <html lang="en" className={`${sans.variable} ${mono.variable} h-full`}>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

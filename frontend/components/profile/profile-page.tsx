@@ -1,19 +1,37 @@
 "use client";
 
-// /profile: saved details + per-site consent. No login: in real mode the client quietly
-// starts an anonymous Supabase session for the 🔒 calls.
+// /profile: saved details + per-site consent. No login: the client quietly starts an
+// anonymous Supabase session for the private calls.
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { doorway, DoorwayError, DOORWAY_MOCK, type Tool } from "@/lib/doorway";
+import { useMemo, type ReactNode } from "react";
+import { doorway, DoorwayError, type Tool } from "@/lib/doorway";
 import { useLive } from "@/lib/doorway/live";
-import { Sprite } from "@/components/px/sprite";
+import { Icon, type IconName } from "@/components/px/icons";
 import { Banner, Button, ButtonLink, Empty, ErrorBanner, Loading, Panel, Skeleton } from "@/components/px/ui";
 import { ConsentMatrix } from "./consent-matrix";
 import { DetailsEditor } from "./details-editor";
 import { allFields, consentFields, profileStrings, toolFields } from "./fields";
 
 const is401 = (err: unknown) => err instanceof DoorwayError && err.status === 401;
+
+function Code({ children }: { children: ReactNode }) {
+  return <code className="rounded bg-panel-3 px-1 py-px font-mono text-xs text-text">{children}</code>;
+}
+
+function HowItem({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <span className="grid size-7 shrink-0 place-items-center rounded-md border border-line bg-panel-2 text-muted">
+        <Icon name={icon} size={14} />
+      </span>
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium text-text">{title}</div>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{children}</p>
+      </div>
+    </div>
+  );
+}
 
 function RetryButton({ onClick }: { onClick: () => void }) {
   return (
@@ -41,28 +59,22 @@ export function ProfilePage({ guest }: { guest: boolean }) {
   const authError = [profile.error, consents.error].find(is401);
 
   return (
-    <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-4 px-4 py-6">
-      <header className="flex flex-wrap items-center gap-5">
-        <Sprite name="agent" scale={4} className="drop-shadow-[0_0_10px_rgba(62,207,142,0.45)]" />
-        <div className="min-w-0 flex-1">
-          <h1 className="font-pixel text-[16px] uppercase text-green px-glow">Your saved details</h1>
-          <p className="mt-2 max-w-3xl text-xl text-text">
-            Save your details once. Doorway only reuses them to fill forms on sites you allow, and only the
-            fields you allow. Nothing is shared without consent.
-          </p>
-          <p className="mt-1 text-base text-faint">
-            {DOORWAY_MOCK
-              ? "Mock mode: changes live in this tab only."
-              : guest
-                ? "You're a guest: details are kept in an anonymous session in this browser. "
-                : "Stored with your account."}
-            {!DOORWAY_MOCK && guest && (
-              <Link href="/login?next=/profile" className="text-green underline">
-                Sign in to keep them
-              </Link>
-            )}
-          </p>
-        </div>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-5 px-4 py-6 lg:px-6">
+      <header className="flex flex-col gap-1.5 border-b border-line pb-5">
+        <h1 className="text-xl font-semibold tracking-tight text-text">Your saved details</h1>
+        <p className="max-w-3xl text-[13px] leading-relaxed text-muted">
+          Save your details once. Doorway only reuses them to fill forms on sites you allow, and only the fields
+          you allow. Nothing is shared without consent.
+        </p>
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-faint">
+          <Icon name={guest ? "user" : "lock"} size={13} />
+          {guest ? "You're a guest: details are kept in an anonymous session in this browser." : "Stored with your account."}
+          {guest && (
+            <Link href="/login?next=/profile" className="text-green underline-offset-2 hover:underline">
+              Sign in to keep them
+            </Link>
+          )}
+        </p>
       </header>
 
       {authError !== undefined && (
@@ -86,7 +98,10 @@ export function ProfilePage({ guest }: { guest: boolean }) {
           {profile.loading ? (
             <div className="flex flex-col gap-4">
               {[0, 1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12" />
+                <div key={i} className="flex flex-col gap-1.5">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-9" />
+                </div>
               ))}
             </div>
           ) : profile.error ? (
@@ -104,7 +119,7 @@ export function ProfilePage({ guest }: { guest: boolean }) {
           title="Who can use them"
           icon="lock"
           className="lg:col-span-8"
-          actions={<span className="text-base text-faint">one row per site · one box per field</span>}
+          actions={<span className="hidden text-xs text-faint sm:inline">One row per site, one box per field</span>}
         >
           {sites.loading || consents.loading ? (
             <Loading label="Loading consents" />
@@ -141,21 +156,20 @@ export function ProfilePage({ guest }: { guest: boolean }) {
       </div>
 
       <Panel title="How it's used" icon="tool">
-        <ul className="grid gap-x-6 gap-y-1 text-base text-muted md:grid-cols-3">
-          <li>
-            <span className="text-green">▸</span> An agent calls a tool with <code className="text-text">use_profile</code>:
-            Doorway fills only the <em>blank</em> inputs, from fields you ticked for that site.
-          </li>
-          <li>
-            <span className="text-green">▸</span> Each tool declares its mapping, e.g.{" "}
-            <code className="text-text">patient_name ← full_name</code>. Unticked fields are never read.
-          </li>
-          <li>
-            <span className="text-green">▸</span> <code className="text-text">remember</code> saves submitted inputs
-            back here. Consent is always a separate, explicit step.
-          </li>
-        </ul>
+        <div className="grid gap-5 md:grid-cols-3">
+          <HowItem icon="agent" title="Only blank inputs">
+            An agent calls a tool with <Code>use_profile</Code>: Doorway fills only the blank inputs, from fields you
+            ticked for that site.
+          </HowItem>
+          <HowItem icon="pattern" title="Declared mappings">
+            Each tool declares its mapping, e.g. <Code>patient_name ← full_name</Code>. Unticked fields are never
+            read.
+          </HowItem>
+          <HowItem icon="lock" title="Consent is separate">
+            <Code>remember</Code> saves submitted inputs back here. Consent is always a separate, explicit step.
+          </HowItem>
+        </div>
       </Panel>
-    </main>
+    </div>
   );
 }

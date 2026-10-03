@@ -1,80 +1,118 @@
-// 8×8 pixel icons drawn in currentColor. Add new ones to ICONS ('#' = pixel).
+// Icon set (Lucide). Kept under the old `PixelIcon` name so every screen keeps working;
+// new code can import `Icon`.
+
+import type { CSSProperties } from "react";
+import {
+  AppWindow,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowUpFromLine,
+  Bot,
+  ChevronRight,
+  CircleCheck,
+  CircleDollarSign,
+  CircleX,
+  Clock,
+  Compass,
+  Copy,
+  CreditCard,
+  Database,
+  Dot,
+  DoorOpen,
+  Eye,
+  Flag,
+  Globe,
+  HeartPulse,
+  LayoutDashboard,
+  Lock,
+  Menu,
+  MessageSquare,
+  Play,
+  Plus,
+  Radio,
+  Search,
+  Server,
+  Settings,
+  Shapes,
+  TriangleAlert,
+  User,
+  Workflow,
+  Wrench,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
 const ICONS = {
-  request: ["...#....", "...##...", "#######.", "########", "#######.", "...##...", "...#....", "........"],
-  lookup: [".####...", "#....#..", "#....#..", "#....#..", ".####...", "....##..", ".....##.", "......##"],
-  discover: ["..####..", ".#....#.", "#....#.#", "#...#..#", "#..#...#", "#.#....#", ".#....#.", "..####.."],
-  observe: ["........", "..####..", ".#....#.", "#..##..#", "#..##..#", ".#....#.", "..####..", "........"],
-  compile: [".#.##.#.", "########", ".##..##.", "##....##", "##....##", ".##..##.", "########", ".#.##.#."],
-  verify: ["........", ".......#", "......##", "#....##.", "##..##..", ".####...", "..##....", "........"],
-  publish: ["...##...", "..####..", ".######.", "...##...", "...##...", "...##...", ".######.", "........"],
-  execute: [".#......", ".##.....", ".###....", ".####...", ".####...", ".###....", ".##.....", ".#......"],
-  bolt: ["....##..", "...##...", "..##....", ".######.", "....##..", "...##...", "..##....", ".#......"],
-  coin: ["..####..", ".#....#.", "#..##..#", "#.##...#", "#..##..#", "#...##.#", ".#.##.#.", "..####.."],
-  heal: ["........", ".##..##.", "########", "########", ".######.", "..####..", "...##...", "........"],
-  broken: ["##....##", ".##..##.", "..####..", "...##...", "..####..", ".##..##.", "##....##", "........"],
-  sandbox: ["########", "#......#", "#.####.#", "#......#", "########", "#......#", "#.##.#.#", "########"],
-  pattern: ["##.##.##", "##.##.##", "........", "##.##.##", "##.##.##", "........", "##.##.##", "##.##.##"],
-  message: [".######.", "#......#", "#.####.#", "#......#", ".######.", "...#....", "..#.....", "........"],
-  dot: ["........", "........", "...##...", "..####..", "..####..", "...##...", "........", "........"],
-  door: [".######.", ".#....#.", ".#....#.", ".#....#.", ".#..#.#.", ".#....#.", ".#....#.", "########"],
-  agent: ["...##...", ".######.", "#.#..#.#", "#.####.#", ".######.", "..#..#..", ".######.", ".#....#."],
-  database: [".######.", "#......#", ".######.", "#......#", ".######.", "#......#", ".######.", "........"],
-  globe: ["..####..", ".#.##.#.", "#..##..#", "########", "#..##..#", ".#.##.#.", "..####..", "........"],
-  tool: ["......##", ".....#.#", "....##..", "...##...", "..##....", ".##.....", "##......", "#......."],
-  warn: ["...##...", "..#..#..", "..#..#..", ".#.##.#.", ".#.##.#.", "#......#", "#..##..#", "########"],
-  user: ["..####..", "..####..", "..####..", "...##...", ".######.", "########", "########", "........"],
-  lock: ["..####..", ".#....#.", ".#....#.", "########", "###..###", "###..###", "########", "........"],
-  copy: ["####....", "#..#....", "#..####.", "####..#.", "...#..#.", "...####.", "........", "........"],
-  clock: ["..####..", ".#..#.#.", "#...#..#", "#...###.", "#......#", "#......#", ".#....#.", "..####.."],
-  plus: ["........", "...##...", "...##...", ".######.", ".######.", "...##...", "...##...", "........"],
-  chevron: ["........", "..#.....", "..##....", "...##...", "...##...", "..##....", "..#.....", "........"],
-  graph: ["##......", "##..##..", "..##..##", "..##..##", "##......", "##..##..", "....##..", "........"],
-  race: ["#.#.#.#.", ".#.#.#.#", "#.#.#.#.", ".#.#.#.#", "#.......", "#.......", "#.......", "#......."],
-  site: ["########", "#.#.#..#", "########", "#......#", "#.####.#", "#......#", "#.##...#", "########"],
-} as const satisfies Record<string, readonly string[]>;
+  request: ArrowRight,
+  lookup: Search,
+  discover: Compass,
+  observe: Eye,
+  compile: Settings,
+  verify: CircleCheck,
+  publish: ArrowUpFromLine,
+  execute: Play,
+  bolt: Zap,
+  coin: CircleDollarSign,
+  heal: HeartPulse,
+  broken: CircleX,
+  sandbox: Server,
+  pattern: Shapes,
+  message: MessageSquare,
+  dot: Dot,
+  door: DoorOpen,
+  agent: Bot,
+  database: Database,
+  globe: Globe,
+  tool: Wrench,
+  warn: TriangleAlert,
+  user: User,
+  lock: Lock,
+  copy: Copy,
+  clock: Clock,
+  plus: Plus,
+  chevron: ChevronRight,
+  graph: Workflow,
+  race: Flag,
+  site: AppWindow,
+  overview: LayoutDashboard,
+  live: Radio,
+  card: CreditCard,
+  external: ArrowUpRight,
+  menu: Menu,
+  close: X,
+} as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
 
-export function PixelIcon({
+export function Icon({
   name,
   size = 16,
   className,
   title,
+  strokeWidth = 1.75,
+  style,
 }: {
   name: IconName;
   size?: number;
   className?: string;
   title?: string;
+  strokeWidth?: number;
+  style?: CSSProperties;
 }) {
-  const rows = ICONS[name];
-  const rects: { x: number; y: number; w: number }[] = [];
-  rows.forEach((row, y) => {
-    let x = 0;
-    while (x < row.length) {
-      if (row[x] === "#") {
-        let w = 1;
-        while (row[x + w] === "#") w++;
-        rects.push({ x, y, w });
-        x += w;
-      } else x++;
-    }
-  });
+  const Cmp = ICONS[name];
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 8 8"
-      shapeRendering="crispEdges"
-      fill="currentColor"
+    <Cmp
+      size={size}
+      strokeWidth={strokeWidth}
       className={className}
-      role={title ? "img" : undefined}
+      style={style}
       aria-hidden={title ? undefined : true}
       aria-label={title}
-    >
-      {rects.map((r) => (
-        <rect key={`${r.x}-${r.y}`} x={r.x} y={r.y} width={r.w} height={1} />
-      ))}
-    </svg>
+      role={title ? "img" : undefined}
+    />
   );
 }
+
+/** @deprecated use Icon */
+export const PixelIcon = Icon;

@@ -148,7 +148,9 @@ def app(ids: list[str], store=None) -> Starlette:
                 ]
         active = sorted({st for job in JOBS.values() for st in STAGES.get(job["kind"], [])})
         body = {"pipeline": PIPELINE, "active": active, "sandboxes": _state(ids), "events": events}
-        return JSONResponse(body, headers={"Cache-Control": "no-store"})
+        # Read-only, public: the dashboard on any origin polls it.
+        headers = {"Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"}
+        return JSONResponse(body, headers=headers)
 
     async def frame(request):
         shot = FRAMES.get(request.path_params["sandbox"])

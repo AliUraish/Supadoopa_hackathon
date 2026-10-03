@@ -3,7 +3,7 @@
 // Every hook loads from the GET endpoints, then listens on the live bus (mock stream or
 // Supabase Realtime). When the bus is down they poll every 2 s instead. With Realtime up
 // they still poll every 3 s: a channel can report SUBSCRIBED while the backend writes to a
-// database Realtime doesn't watch (e.g. a local Postgres). Mock mode never polls.
+// database Realtime doesn't watch (e.g. a local Postgres).
 
 import {
   useCallback,
@@ -12,10 +12,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { DOORWAY_MOCK, liveBus } from "@/lib/doorway";
+import { liveBus } from "@/lib/doorway";
 import type { BusStatus, RealtimeTable, RowChange } from "@/lib/doorway/types";
 
-export type LiveMode = "mock" | "realtime" | "polling";
+export type LiveMode = "realtime" | "polling";
 
 export function useBusStatus(): BusStatus {
   return useSyncExternalStore(
@@ -27,7 +27,6 @@ export function useBusStatus(): BusStatus {
 
 export function useLiveMode(): LiveMode {
   const status = useBusStatus();
-  if (DOORWAY_MOCK) return "mock";
   return status === "live" ? "realtime" : "polling";
 }
 
@@ -110,7 +109,7 @@ export function useLive<T>(
     );
 
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (!DOORWAY_MOCK && poll) {
+    if (poll) {
       const every = busStatus === "live" ? livePollMs : pollMs;
       interval = setInterval(() => {
         if (!document.hidden) run();
@@ -213,7 +212,7 @@ export function useFeed<T extends { id: number }>(
     });
 
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (!DOORWAY_MOCK) {
+    {
       interval = setInterval(
         () => {
           if (document.hidden) return;

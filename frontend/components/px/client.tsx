@@ -1,20 +1,19 @@
 "use client";
 
-// Interactive pixel primitives (hooks inside).
+// Interactive primitives (hooks inside).
 
 import { useState, type ReactNode } from "react";
-import { DOORWAY_MOCK } from "@/lib/doorway";
 import { clockTime, timeAgo } from "@/lib/doorway/format";
 import { useLiveMode, useNow } from "@/lib/doorway/live";
-import { PixelIcon } from "./icons";
+import { Icon } from "./icons";
 import { cx } from "./ui";
 
 export function CopyCommand({ command, className }: { command: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className={cx("px-inset flex items-center gap-2 py-2 pl-3 pr-2", className)}>
-      <span className="select-none text-green">$</span>
-      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-base text-green-hi">{command}</code>
+    <div className={cx("px-inset flex items-center gap-2 py-1.5 pl-3 pr-1.5", className)}>
+      <span className="select-none font-mono text-xs text-faint">$</span>
+      <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-text">{command}</code>
       <button
         type="button"
         className="px-btn px-btn--ghost px-btn--sm"
@@ -29,7 +28,7 @@ export function CopyCommand({ command, className }: { command: string; className
         }}
         aria-label="Copy command"
       >
-        <PixelIcon name={copied ? "verify" : "copy"} size={10} />
+        <Icon name={copied ? "verify" : "copy"} size={13} />
         {copied ? "Copied" : "Copy"}
       </button>
     </div>
@@ -59,20 +58,21 @@ export function Toggle({
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className="px-frame relative mt-0.5 h-4 w-8 shrink-0"
-        style={{
-          ["--frame" as string]: checked ? "var(--color-green)" : "var(--color-line-2)",
-          background: checked ? "var(--color-green-deep)" : "var(--color-bg-2)",
-        }}
+        className={cx(
+          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition-colors duration-150",
+          checked ? "border-green-dim bg-green" : "border-line-2 bg-panel-3",
+        )}
       >
         <span
-          className="absolute top-0 size-4 transition-[left] duration-100"
-          style={{ left: checked ? 16 : 0, background: checked ? "var(--color-green)" : "var(--color-faint)" }}
+          className={cx(
+            "absolute top-0.5 size-3.5 rounded-full shadow transition-[left] duration-150",
+            checked ? "left-[18px] bg-green-ink" : "left-0.5 bg-muted",
+          )}
         />
       </button>
       <span className="flex flex-col">
-        <span className="text-base text-text">{label}</span>
-        {hint && <span className="text-sm text-faint">{hint}</span>}
+        <span className="text-[13px] text-text">{label}</span>
+        {hint && <span className="text-xs text-faint">{hint}</span>}
       </span>
     </label>
   );
@@ -87,24 +87,24 @@ export function TimeAgo({ iso, className }: { iso: string | null | undefined; cl
   );
 }
 
-/** MOCK / REALTIME / POLLING indicator for live panels. */
+/** Realtime / Polling indicator for live panels. */
 export function LiveBadge({ className }: { className?: string }) {
   const mode = useLiveMode();
-  const label = DOORWAY_MOCK ? "Mock stream" : mode === "realtime" ? "Realtime" : "Polling 2s";
+  const label = mode === "realtime" ? "Realtime" : "Polling";
   const color = mode === "polling" ? "var(--color-amber)" : "var(--color-green)";
   return (
     <span
-      className={cx("font-pixel inline-flex items-center gap-1.5 text-[8px] uppercase", className)}
-      style={{ color }}
+      className={cx("inline-flex items-center gap-1.5 text-xs text-muted", className)}
       title={
         mode === "polling"
           ? "Supabase Realtime is unavailable: polling the API every 2 s"
-          : mode === "realtime"
-            ? "Live via Supabase Realtime"
-            : "NEXT_PUBLIC_DOORWAY_MOCK=1: fixtures and a fake live stream"
+          : "Live via Supabase Realtime"
       }
     >
-      <span className="animate-blink inline-block size-2" style={{ background: color }} />
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-full animate-ping rounded-full opacity-60" style={{ background: color }} />
+        <span className="relative inline-flex size-2 rounded-full" style={{ background: color }} />
+      </span>
       {label}
     </span>
   );

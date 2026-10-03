@@ -1,18 +1,24 @@
-// Dashboard tab ids, shared by the server page (initial tab) and the client tabs.
+// Dashboard sections, shared by the sidebar, the server page and the client tabs.
 
 import type { IconName } from "@/components/px/icons";
 
 export const TABS = [
-  { id: "workspace", label: "Workspace", icon: "agent" },
-  { id: "live", label: "Live", icon: "observe" },
-  { id: "graph", label: "Graph", icon: "graph" },
-  { id: "race", label: "Race", icon: "race" },
-  { id: "sandboxes", label: "Sandboxes", icon: "sandbox" },
-  { id: "sites", label: "Sites", icon: "site" },
-] as const satisfies readonly { id: string; label: string; icon: IconName }[];
+  { id: "workspace", label: "Workspace", icon: "overview", supabase: false },
+  { id: "sandboxes", label: "Sandboxes", icon: "sandbox", supabase: true },
+  { id: "sites", label: "Websites", icon: "globe", supabase: false },
+  { id: "tools", label: "Tools", icon: "tool", supabase: false },
+  { id: "install", label: "Install", icon: "plus", supabase: false },
+] as const satisfies readonly { id: string; label: string; icon: IconName; supabase: boolean }[];
 
 export type TabId = (typeof TABS)[number]["id"];
 
 export function isTabId(value: unknown): value is TabId {
   return TABS.some((t) => t.id === value);
+}
+
+/** ?tab= value → tab (old names map to their new home). */
+export function parseTab(value: string | null | undefined): TabId {
+  if (value === "overview" || value === "graph" || value === "race") return "workspace";
+  if (value === "live") return "sandboxes";
+  return isTabId(value) ? value : "workspace";
 }

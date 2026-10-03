@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     doorway_model: str | None = _env("DOORWAY_MODEL")  # default chosen in app/doorway
     # Local demos only: dashboard actions without a token run as a shared demo user.
     doorway_demo_open: bool | None = _env("DOORWAY_DEMO_OPEN")
+    # The owner's own Claude sends X-Doorway-Key: MCP actions then run directly (test-mode pay).
+    doorway_owner_key: str | None = _env("DOORWAY_OWNER_KEY")
     # Public URL of the sandboxes' live view (default: <SUPABASE_URL>/compute/v1/doorway-sandbox/).
     doorway_live_url: str | None = _env("DOORWAY_LIVE_URL")
     # x-admin-token for demo sites' /admin/version (break/reset).

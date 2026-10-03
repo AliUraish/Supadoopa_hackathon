@@ -673,14 +673,29 @@ async def revoke_consent(
 
 
 @router.post("/mcp", include_in_schema=False)
-async def mcp_all(store: DoorwayStore = Store) -> Response:
-    return MCPResponse(build_server(store))
+async def mcp_all(request: Request, store: DoorwayStore = Store) -> Response:
+    return MCPResponse(build_server(store, pay=_owner_pay(request, store)))
 
 
 @router.post("/sites/{site_id}/mcp", include_in_schema=False)
-async def mcp_site(site_id: str, store: DoorwayStore = Store) -> Response:
+async def mcp_site(site_id: str, request: Request, store: DoorwayStore = Store) -> Response:
     await _site_or_404(store, site_id)
-    return MCPResponse(build_server(store, site_id))
+    return MCPResponse(build_server(store, site_id, pay=_owner_pay(request, store)))
+
+
+def _owner_pay(request: Request, store: DoorwayStore):
+    """The owner's own Claude (X-Doorway-Key) runs actions directly, paid in Stripe test mode."""
+    settings = get_settings()
+    key = request.headers.get("x-doorway-key") or ""
+    if not settings.doorway_owner_key or settings.stripe_live:
+        return None
+    if not secrets.compare_digest(key, settings.doorway_owner_key):
+        return None
+
+    async def pay(tool: dict) -> dict:
+        return await _test_payment(store, tool)
+
+    return pay
 
 
 # --- /llms.txt + install ------------------------------------------------------------------------

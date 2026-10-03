@@ -48,6 +48,10 @@ API_TIMEOUT_S = 20
 ACTION_TIMEOUT_MS = 8_000
 NAV_TIMEOUT_MS = 15_000
 MISSING_WAIT_MS = 1_500
+SETTLE_MS = 3_000  # bounded networkidle wait before reading a page result
+MANY_WAIT_MS = 3_000  # bounded wait for a list's first row after its wait element shows
+OVERFIT_ERROR = "only works for the example input (hard-coded value)"
+FIRST_ITEM = re.compile(r"(\{\{\s*from:([^:{}]+):)0(?=[.\s|}])")
 BROKEN_STATUSES = {404, 405, 410}
 NON_BLANK = re.compile(r"\S")
 
@@ -206,8 +210,12 @@ async def _read(page: Any, result: dict, inputs: dict) -> Any:
         if result.get("error_selector")
         else None
     )
-    if not (result.get("many") and result.get("wait")):  # a waited-for list may be empty
-        await (ready.or_(error) if error else ready).first.wait_for(state=state)
+    first = (ready.or_(error) if error else ready).first
+    if not (result.get("many") and result.get("wait")):
+        await first.wait_for(state=state)
+    else:  # a waited-for list may be empty, but rows can render after the wait element
+        with contextlib.suppress(PlaywrightTimeout):
+            await first.wait_for(state="attached", timeout=MANY_WAIT_MS)
     if error and await error.count():
         message = (await error.first.inner_text()).strip()
         raise _Failure(message or "the site reported an error", broken=False)
@@ -233,6 +241,8 @@ async def _run_page(
             current = f"{step.get('action', 'fill')} {step.get('selector') or step.get('path', '')}"
             await _step(page, step, inputs, base_url)
             done += 1
+        with contextlib.suppress(PlaywrightTimeout, PlaywrightError):  # let XHR results land
+            await page.wait_for_load_state("networkidle", timeout=SETTLE_MS)
         current = f"read {result.get('selector')}"
         data = await _read(page, result, inputs)
         return ExecResult(ok=True, strategy=name, data=data, ms=_ms(started), steps=done)
@@ -361,6 +371,23 @@ async def verify(
             if spec["kind"] == "action":
                 stale.update(deps)
 
+        if "api" in runs and runs["api"][0].ok:  # page strategies must not be overfit
+            for strat in [s for s in ("form", "browser") if s in runs and runs[s][0].ok]:
+                for dep in depends_on(spec):
+                    if dep in stale and dep in producers:
+                        await refresh(dep)
+                if (second := _second_item_inputs(spec, outputs)) is None:
+                    break  # no index-0 binding, or the producer returned < 2 items
+                r = await execute(spec, second, base_url, strategy=strat, browser=browser)
+                if spec["kind"] == "action":
+                    stale.update(depends_on(spec))
+                if not r.ok:
+                    first, used = runs[strat]
+                    runs[strat] = (
+                        ExecResult(ok=False, strategy=strat, error=OVERFIT_ERROR, ms=first.ms),
+                        used,
+                    )
+
         passing = [s for s, (r, _) in runs.items() if r.ok]
         pick = spec["preferred"] if spec["preferred"] in passing else next(iter(passing), None)
         by_strategy = {
@@ -392,6 +419,22 @@ async def verify(
             )  # fmt: skip
         )
     return results
+
+
+def _second_item_inputs(spec: dict, outputs: dict[str, Any]) -> dict | None:
+    """The test input re-bound from item 0 to item 1 of each producer's list, or None when
+    the test has no {{from:<tool>:0...}} binding or a producer returned fewer than 2 items."""
+    raw = json.dumps((spec.get("test") or {}).get("input") or {})
+    second = FIRST_ITEM.sub(r"\g<1>1", raw)
+    if second == raw:
+        return None
+    for tool in {m.group(2) for m in FIRST_ITEM.finditer(raw)}:
+        if not isinstance(outputs.get(tool), list) or len(outputs[tool]) < 2:
+            return None
+    try:
+        return resolve_test_inputs({"test": {"input": json.loads(second)}}, outputs)
+    except ValueError:
+        return None
 
 
 async def benchmark(

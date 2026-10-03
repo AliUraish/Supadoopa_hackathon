@@ -1,17 +1,16 @@
 "use client";
 
 // One website: status, discovery progress, verified-tool meter and the demo buttons
-// (break the private API → watch the tools self-heal; reset; race; open).
+// (break the private API → watch the tools self-heal; reset; open).
 
 import Link from "next/link";
 import { useState, type CSSProperties } from "react";
 import { describeError, doorway, type Site, type SiteStatus } from "@/lib/doorway";
 import { TONE_COLOR, type Tone } from "@/lib/doorway/format";
 import { useAction, useNow } from "@/lib/doorway/live";
-import { useDashboardNav } from "@/components/dashboard/dashboard-tabs";
 import { TimeAgo } from "@/components/px/client";
-import { PixelIcon } from "@/components/px/icons";
-import { Badge, Button, ButtonLink, cx, Meter } from "@/components/px/ui";
+import { Icon } from "@/components/px/icons";
+import { Badge, Button, ButtonLink, cx, Meter, Skeleton } from "@/components/px/ui";
 import { PhaseStrip } from "./phase-strip";
 
 const BUSY: SiteStatus[] = ["queued", "discovering", "verifying", "healing"];
@@ -38,7 +37,6 @@ interface ApiNote {
 }
 
 export function SiteCard({ site, fresh }: { site: Site; fresh?: boolean }) {
-  const { goTo } = useDashboardNav();
   const now = useNow();
   const [note, setNote] = useState<ApiNote | null>(null);
   const breakIt = useAction((id: string) => doorway.breakSite(id));
@@ -64,118 +62,111 @@ export function SiteCard({ site, fresh }: { site: Site; fresh?: boolean }) {
 
   const frame: Tone | null =
     site.status === "broken" || site.status === "failed" ? "bad" : site.status === "healing" ? "warn" : fresh ? "ok" : null;
-  const segments = site.tools_count > 0 && site.tools_count <= 16 ? site.tools_count : 16;
+  const tone = meterTone(site);
 
   return (
     <article
-      className={cx("px-panel flex min-w-0 flex-col", fresh && "px-rise")}
-      style={frame ? ({ "--frame": TONE_COLOR[frame] } as CSSProperties) : undefined}
+      className={cx("px-panel flex min-w-0 flex-col transition-colors duration-300", fresh && "animate-rise")}
+      style={
+        frame
+          ? ({ "--frame": `color-mix(in srgb, ${TONE_COLOR[frame]} 45%, transparent)` } as CSSProperties)
+          : undefined
+      }
     >
-      <header className="flex items-start justify-between gap-3 border-b-2 border-line bg-panel-2 px-3 py-2.5">
-        <div className="min-w-0">
-          <Link
-            href={`/sites/${site.id}`}
-            className="font-pixel block truncate text-[11px] uppercase text-green hover:text-green-hi px-glow"
-            title={`Open ${site.name}`}
-          >
-            {site.name}
-          </Link>
-          <a
-            href={site.base_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 flex min-w-0 items-center gap-1 text-sm text-muted hover:text-green"
-            title={site.base_url}
-          >
-            <PixelIcon name="globe" size={10} className="shrink-0" />
-            <span className="truncate">{hostOf(site.base_url)}</span>
-            <span aria-hidden className="shrink-0">↗</span>
-          </a>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Badge status={site.status} pulse={busy}>
-            {site.status}
-          </Badge>
-          {showNote && note && (
-            <Badge tone={/^v?1$/i.test(note.version) ? "info" : "warn"} pulse={false}>
-              API {/^v/i.test(note.version) ? note.version : `v${note.version}`}
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link
+              href={`/sites/${site.id}`}
+              className="block truncate text-[14px] font-medium text-text hover:text-green"
+              title={`Open ${site.name}`}
+            >
+              {site.name}
+            </Link>
+            <a
+              href={site.base_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-xs text-faint hover:text-green"
+              title={site.base_url}
+            >
+              <span className="truncate">{hostOf(site.base_url)}</span>
+              <Icon name="external" size={12} className="shrink-0" />
+            </a>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <Badge status={site.status} pulse={busy}>
+              {site.status}
             </Badge>
-          )}
-        </div>
-      </header>
+            {showNote && note && (
+              <Badge tone={/^v?1$/i.test(note.version) ? "info" : "warn"} pulse={false} className="font-mono normal-case">
+                API {/^v/i.test(note.version) ? note.version : `v${note.version}`}
+              </Badge>
+            )}
+          </div>
+        </header>
 
-      <div className="flex flex-1 flex-col gap-3 p-3">
-        <p className="min-h-[2.5em] text-base leading-tight">
-          {site.goal ? (
-            <>
-              <span className="text-green">▸ </span>
-              <span className="text-text">{site.goal}</span>
-            </>
-          ) : (
-            <span className="text-faint">No goal set: Doorway maps every capability it finds.</span>
-          )}
+        <p className="line-clamp-2 min-h-[2lh] text-[13px] leading-snug text-muted">
+          {site.goal ?? <span className="text-faint">No goal set: Doorway maps every capability it finds.</span>}
         </p>
 
         <PhaseStrip status={site.status} />
 
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-base">
-              {site.tools_count > 0 ? (
-                <>
-                  <span style={{ color: TONE_COLOR[meterTone(site)] }}>
-                    {site.verified_count}/{site.tools_count}
-                  </span>{" "}
-                  <span className="text-muted">verified</span>
-                </>
-              ) : (
-                <span className="text-faint">{busy ? "finding tools…" : "no tools yet"}</span>
-              )}
-            </span>
-            <span className="text-sm text-faint">
-              {site.id} · <TimeAgo iso={site.updated_at} />
+          <div className="flex items-baseline justify-between gap-3 text-xs">
+            {site.tools_count > 0 ? (
+              <span className="text-muted">
+                <span className="font-mono tabular-nums text-text">
+                  {site.verified_count}/{site.tools_count}
+                </span>{" "}
+                tools verified
+              </span>
+            ) : (
+              <span className="text-faint">{busy ? "Finding tools" : "No tools yet"}</span>
+            )}
+            <span className="flex min-w-0 items-center gap-1 text-faint">
+              <Icon name="clock" size={12} className="shrink-0" />
+              <TimeAgo iso={site.updated_at} className="truncate" />
             </span>
           </div>
-          <Meter value={site.verified_count} max={Math.max(1, site.tools_count)} segments={segments} tone={meterTone(site)} />
-        </div>
-
-        <div className="mt-auto flex flex-wrap gap-2 pt-1">
-          <Button
-            size="sm"
-            variant="danger"
-            icon="broken"
-            loading={breakIt.pending}
-            disabled={pending && !breakIt.pending}
-            onClick={() => demo(breakIt)}
-            title="Flip the private API v1 → v2; tools will self-heal"
-          >
-            Break
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={resetIt.pending}
-            disabled={pending && !resetIt.pending}
-            onClick={() => demo(resetIt)}
-            title="Restore API v1 and clear demo bookings"
-          >
-            Reset
-          </Button>
-          <Button size="sm" variant="ghost" icon="race" onClick={() => goTo("race", { siteId: site.id })}>
-            Race
-          </Button>
-          <ButtonLink size="sm" variant="ghost" icon="chevron" href={`/sites/${site.id}`} className="ml-auto">
-            Open
-          </ButtonLink>
+          <Meter value={site.verified_count} max={Math.max(1, site.tools_count)} tone={tone} />
         </div>
 
         {actionError !== undefined && (
-          <p role="alert" className="flex items-start gap-1.5 text-sm text-red">
-            <PixelIcon name="warn" size={10} className="mt-1 shrink-0" />
+          <p role="alert" className="flex items-start gap-1.5 text-xs text-red">
+            <Icon name="warn" size={13} className="mt-px shrink-0" />
             <span>{describeError(actionError)}</span>
           </p>
         )}
       </div>
+
+      <footer className="flex flex-wrap items-center gap-1.5 border-t border-line px-3 py-2.5">
+        <Button
+          size="sm"
+          variant="danger"
+          icon="broken"
+          loading={breakIt.pending}
+          disabled={pending && !breakIt.pending}
+          onClick={() => demo(breakIt)}
+          title="Flip the private API v1 → v2; tools will self-heal"
+        >
+          Break
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={resetIt.pending}
+          disabled={pending && !resetIt.pending}
+          onClick={() => demo(resetIt)}
+          title="Restore API v1 and clear demo bookings"
+        >
+          Reset
+        </Button>
+        <ButtonLink size="sm" variant="ghost" href={`/sites/${site.id}`} className="ml-auto">
+          Open
+          <Icon name="chevron" size={13} />
+        </ButtonLink>
+      </footer>
     </article>
   );
 }
@@ -183,24 +174,26 @@ export function SiteCard({ site, fresh }: { site: Site; fresh?: boolean }) {
 /** Placeholder card while the list loads. */
 export function SiteCardSkeleton() {
   return (
-    <div className="px-panel flex flex-col gap-3 p-3" aria-hidden>
-      <div className="flex justify-between gap-3">
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="h-3 w-2/3 animate-pulse-px bg-panel-3" />
-          <div className="h-3 w-1/2 animate-pulse-px bg-panel-3" />
+    <div className="px-panel flex flex-col" aria-hidden>
+      <div className="flex flex-col gap-4 p-4">
+        <div className="flex justify-between gap-3">
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
         </div>
-        <div className="h-5 w-16 animate-pulse-px bg-panel-3" />
+        <Skeleton className="h-8" />
+        <div className="grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-3" />
+          ))}
+        </div>
+        <Skeleton className="h-1.5" />
       </div>
-      <div className="h-8 animate-pulse-px bg-panel-3" />
-      <div className="grid grid-cols-4 gap-1">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-1.5 animate-pulse-px bg-panel-3" />
-        ))}
-      </div>
-      <div className="h-3 animate-pulse-px bg-panel-3" />
-      <div className="flex gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-7 w-16 animate-pulse-px bg-panel-3" />
+      <div className="flex gap-2 border-t border-line px-3 py-2.5">
+        {[0, 1].map((i) => (
+          <Skeleton key={i} className="h-7 w-16" />
         ))}
       </div>
     </div>
