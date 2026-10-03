@@ -432,3 +432,9 @@ size = "4gb"
 exposure = "public" # serves the live view of the sandbox browsers on $PORT
 source = "backend"
 exclude = [".env", ".env.*", ".git", ".venv", ".devdb", "tests", "demo_sites", "scripts", "__pycache__", ".pytest_cache", ".ruff_cache"]
+
+# Doorway demo target: City Library (search → place hold, contact form).
+[compute.library]
+runtime = "dockerfile"
+size = "2gb"
+exposure = "public"
