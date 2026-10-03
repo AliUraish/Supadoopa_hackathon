@@ -26,9 +26,11 @@ class SubscriptionOut(BaseModel):
 
 class PurchaseOut(BaseModel):
     id: str
-    status: str
+    status: str  # pending | paid | failed | refunded | disputed | dispute_lost
+    source: str | None = None  # checkout | payment_link | elements | invoice | agent
     price_lookup_key: str | None = None
     amount_total: int | None = None
+    amount_refunded: int = 0
     currency: str | None = None
     created_at: str | None = None
 

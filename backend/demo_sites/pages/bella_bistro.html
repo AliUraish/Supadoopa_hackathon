@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bella Bistro · Reserve a table</title>
+<style>
+  :root {
+    --wine: #7a1f2b; --wine-dark: #5c1520; --gold: #e3b85c; --cream: #f8f1e5; --paper: #fffcf6;
+    --ink: #2b1d16; --muted: #7a6656; --line: #eadcc6; --olive: #4d6a2b;
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0; color: var(--ink); background: var(--cream);
+    font: 17px/1.55 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  header {
+    text-align: center; color: #fff; padding: 40px 16px 34px; border-bottom: 6px double var(--gold);
+    background: radial-gradient(circle at 50% -40%, #a3343f 0, var(--wine) 60%, var(--wine-dark));
+  }
+  .eyebrow { margin: 0; font: 600 12px/1 system-ui, sans-serif; letter-spacing: .32em;
+    text-transform: uppercase; color: var(--gold) }
+  header h1 { margin: 10px 0 6px; font-size: 46px; font-style: italic; font-weight: 600 }
+  header p { margin: 0; opacity: .9 }
+  main { max-width: 700px; margin: 28px auto 40px; padding: 0 16px }
+  .card {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 16px;
+    padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 10px 30px -22px rgba(60, 20, 10, .5);
+  }
+  h2 { margin: 0; font-size: 22px; color: var(--wine) }
+  h2 span { font-style: italic; color: var(--gold); margin-right: 6px }
+  .row { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: 14px }
+  label {
+    display: block; margin: 16px 0 6px; color: var(--muted);
+    font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  }
+  select, input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font: 16px system-ui, sans-serif; color: var(--ink); background: #fff;
+  }
+  select:focus, input:focus, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px }
+  button {
+    margin-top: 18px; padding: 11px 24px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--wine); color: #fff; font: 600 15px system-ui, sans-serif;
+  }
+  button:hover { background: var(--wine-dark) }
+  #area-note { margin: 6px 0 0; font-style: italic; color: var(--muted) }
+  .slots { display: flex; flex-wrap: wrap; gap: 8px }
+  .slots button { margin: 0; padding: 8px 16px; background: #fff; color: var(--wine);
+    border: 1px solid var(--wine) }
+  .slots button[aria-pressed=true] { background: var(--wine); color: #fff }
+  .muted { color: var(--muted) } .hidden { display: none }
+  #result { margin: 16px 0 0; font-family: system-ui, sans-serif }
+  .ok { color: var(--olive); font-weight: 700 } .err { color: #b42318 }
+  footer { text-align: center; color: var(--muted); font-size: 14px; padding: 0 16px 32px }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr } header h1 { font-size: 38px } }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Trattoria · Since 1987</p>
+  <h1>Bella Bistro</h1>
+  <p>Handmade pasta, wood-fired plates, and a table waiting for you.</p>
+</header>
+<main>
+  <section class="card" aria-labelledby="step1">
+    <h2 id="step1"><span>1.</span>Find a table</h2>
+    <form id="search-form" novalidate>
+      <div class="row">
+        <div><label for="area">Seating area</label><select id="area" name="area"></select></div>
+        <div><label for="date">Date</label><input id="date" name="date" type="date"></div>
+        <div><label for="party">Guests</label>
+          <input id="party" name="party" type="number" min="1" max="10" value="2"></div>
+      </div>
+      <p id="area-note"></p>
+      <button id="find" type="submit">Find a table</button>
+    </form>
+    <p id="slots-msg" class="muted" aria-live="polite"></p>
+    <div id="slots" class="slots" role="group" aria-label="Available times"></div>
+  </section>
+  <section class="card hidden" id="details" aria-labelledby="step2">
+    <h2 id="step2"><span>2.</span>Your details</h2>
+    <form id="book-form" novalidate>
+      <label for="name">Name for the reservation</label>
+      <input id="name" name="name" autocomplete="name">
+      <label for="phone">Phone</label>
+      <input id="phone" name="phone" type="tel" autocomplete="tel">
+      <button id="book" type="submit">Reserve table</button>
+    </form>
+    <p id="result" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<footer>12 Via Roma · Lunch 12–14 · Dinner 17:30–22 · Open every day</footer>
+<script>
+/*CLIENT*/
+let chosen = null;
+$('date').value = tomorrow();
+const showNote = () => { $('area-note').textContent = $('area').selectedOptions[0]?.dataset.note || ''; };
+$('area').onchange = showNote;
+client.areas().then((areas) => {
+  $('area').innerHTML = areas.map((a) =>
+    `<option value="${esc(a.id)}" data-note="${esc(a.note)}">${esc(a.name)} · up to ${a.max}</option>`,
+  ).join('');
+  showNote();
+});
+$('search-form').onsubmit = async (e) => {
+  e.preventDefault();
+  chosen = null;
+  $('details').classList.add('hidden');
+  $('slots').innerHTML = '';
+  try {
+    const slots = await client.slots($('area').value, $('date').value, $('party').value);
+    $('slots-msg').textContent = slots.length
+      ? 'Pick a time:' : 'No tables left for a party that size on this day.';
+    $('slots').innerHTML = slots.map((s) =>
+      `<button type="button" data-id="${esc(s.id)}" aria-pressed="false">${esc(s.time)}</button>`,
+    ).join('');
+  } catch (err) {
+    $('slots-msg').textContent = 'Could not load times: ' + err.message;
+  }
+};
+$('slots').onclick = (e) => {
+  const picked = e.target.closest('button');
+  if (!picked) return;
+  $('slots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === picked)));
+  chosen = picked.dataset.id;
+  $('result').textContent = '';
+  $('details').classList.remove('hidden');
+  $('name').focus();
+};
+$('book-form').onsubmit = async (e) => {
+  e.preventDefault();
+  if (!chosen) return;
+  const r = await client.book(chosen, $('name').value, $('phone').value, $('party').value);
+  $('result').className = r.error ? 'err' : 'ok';
+  if (r.error) { $('result').textContent = failure('book', r.error); return; }
+  $('result').textContent =
+    `Booked! Table for ${r.party}, ${r.where}, ${r.when}. Reference ${r.id}.`;
+  $('slots').querySelector('[aria-pressed=true]')?.remove();
+  chosen = null;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+[
+  {
+    "name": "list_doctors",
+    "description": "List the clinic's doctors with their id and name. Use the id with list_open_slots.",
+    "kind": "read",
+    "input_schema": { "type": "object", "properties": {}, "required": [] },
+    "strategies": {
+      "api": {
+        "request": { "method": "GET", "path": "api/doctors" },
+        "response": { "select": "doctors" }
+      },
+      "form": {
+        "path": "",
+        "fields": [],
+        "result": { "selector": "#doctor option", "many": true, "fields": { "id": "@value", "name": "text" } }
+      },
+      "browser": {
+        "steps": [
+          { "action": "goto", "path": "" },
+          { "action": "wait", "selector": "#doctor option", "state": "attached" }
+        ],
+        "result": { "selector": "#doctor option", "many": true, "fields": { "id": "@value", "name": "text" } }
+      }
+    },
+    "preferred": "api",
+    "test": { "input": {} }
+  },
+  {
+    "name": "list_open_slots",
+    "description": "List open appointment slots (id and time) for one doctor on one day.",
+    "kind": "read",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "doctor_id": { "type": "string", "description": "Doctor id from list_doctors" },
+        "date": { "type": "string", "description": "Day as YYYY-MM-DD" }
+      },
+      "required": ["doctor_id", "date"]
+    },
+    "strategies": {
+      "api": {
+        "request": { "method": "GET", "path": "api/slots", "query": { "doctor": "{{doctor_id}}", "date": "{{date}}" } },
+        "response": { "select": "slots" }
+      },
+      "form": {
+        "path": "",
+        "fields": [
+          { "selector": "#doctor", "action": "select", "value": "{{doctor_id}}" },
+          { "selector": "#date", "action": "fill", "value": "{{date}}" }
+        ],
+        "submit": "#find",
+        "result": { "wait": "#slots-msg", "selector": "#slots button", "many": true, "fields": { "id": "@data-id", "time": "text" } }
+      },
+      "browser": {
+        "steps": [
+          { "action": "goto", "path": "" },
+          { "action": "wait", "selector": "#doctor option", "state": "attached" },
+          { "action": "select", "selector": "#doctor", "value": "{{doctor_id}}" },
+          { "action": "fill", "selector": "#date", "value": "{{date}}" },
+          { "action": "click", "selector": "#find" },
+          { "action": "wait", "selector": "#slots-msg" }
+        ],
+        "result": { "selector": "#slots button", "many": true, "fields": { "id": "@data-id", "time": "text" } }
+      }
+    },
+    "preferred": "api",
+    "test": { "input": { "doctor_id": "{{from:list_doctors:0.id}}", "date": "2026-12-01" } }
+  },
+  {
+    "name": "book_appointment",
+    "description": "Book an open slot for a patient. Returns the appointment reference.",
+    "kind": "action",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "slot_id": { "type": "string", "description": "Slot id from list_open_slots" },
+        "patient_name": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["slot_id", "patient_name", "phone"]
+    },
+    "profile_fields": { "patient_name": "full_name", "phone": "phone" },
+    "strategies": {
+      "api": {
+        "request": {
+          "method": "POST",
+          "path": "api/appointments",
+          "body": { "slot_id": "{{slot_id}}", "patient_name": "{{patient_name}}", "phone": "{{phone}}" }
+        },
+        "response": { "select": "appointment" }
+      },
+      "form": {
+        "path": "",
+        "fields": [
+          { "selector": "#doctor", "action": "select", "value": "{{slot_id|split:-:0}}" },
+          { "selector": "#date", "action": "fill", "value": "{{slot_id|split:-:1:4}}" },
+          { "selector": "#find", "action": "click" },
+          { "selector": "#slots-msg", "action": "wait" },
+          { "selector": "#slots button[data-id=\"{{slot_id}}\"]", "action": "click", "missing_error": "slot {{slot_id}} is not open" },
+          { "selector": "#name", "action": "fill", "value": "{{patient_name}}" },
+          { "selector": "#phone", "action": "fill", "value": "{{phone}}" }
+        ],
+        "submit": "#book",
+        "result": { "selector": "#result", "error_selector": "#result.err" }
+      },
+      "browser": {
+        "steps": [
+          { "action": "goto", "path": "" },
+          { "action": "wait", "selector": "#doctor option", "state": "attached" },
+          { "action": "select", "selector": "#doctor", "value": "{{slot_id|split:-:0}}" },
+          { "action": "fill", "selector": "#date", "value": "{{slot_id|split:-:1:4}}" },
+          { "action": "click", "selector": "#find" },
+          { "action": "wait", "selector": "#slots-msg" },
+          { "action": "click", "selector": "#slots button[data-id=\"{{slot_id}}\"]", "missing_error": "slot {{slot_id}} is not open" },
+          { "action": "wait", "selector": "#details" },
+          { "action": "fill", "selector": "#name", "value": "{{patient_name}}" },
+          { "action": "fill", "selector": "#phone", "value": "{{phone}}" },
+          { "action": "click", "selector": "#book" }
+        ],
+        "result": { "selector": "#result", "error_selector": "#result.err" }
+      }
+    },
+    "preferred": "api",
+    "test": { "input": { "slot_id": "{{from:list_open_slots:0.id}}", "patient_name": "Doorway Verifier", "phone": "000-0000" } }
+  }
+]

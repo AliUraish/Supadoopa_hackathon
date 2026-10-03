@@ -25,13 +25,18 @@ create table public.billing_subscriptions (
 create index billing_subscriptions_user_id_idx on public.billing_subscriptions (user_id);
 
 create table public.billing_purchases (
-  id text primary key, -- cs_… (Checkout Session)
-  user_id uuid,
+  id text primary key, -- cs_… (Checkout / Payment Link), pi_… (Elements / agent), in_… (invoice)
+  user_id uuid, -- null for anonymous agent purchases
   stripe_customer_id text,
+  payment_intent_id text unique, -- ties refunds and disputes back to the purchase
+  source text not null default 'checkout'
+    check (source in ('checkout', 'payment_link', 'elements', 'invoice', 'agent')),
   price_lookup_key text,
   amount_total bigint,
+  amount_refunded bigint not null default 0,
   currency text,
-  status text not null check (status in ('paid', 'pending', 'failed')),
+  status text not null
+    check (status in ('pending', 'paid', 'failed', 'refunded', 'disputed', 'dispute_lost')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -54,11 +59,32 @@ create table public.billing_mpp_payments (
   created_at timestamptz not null default now()
 );
 
+-- Link Agent Wallet: a user's OAuth grant, so the app's agent can request spends.
+-- Backend-only (no RLS policies). Consider Supabase Vault for these tokens in production.
+create table public.billing_link_wallets (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  scope text,
+  updated_at timestamptz not null default now()
+);
+
+-- Pending Link OAuth authorizations (PKCE verifier kept server-side).
+create table public.billing_link_oauth_states (
+  state text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  code_verifier text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table public.billing_customers enable row level security;
 alter table public.billing_subscriptions enable row level security;
 alter table public.billing_purchases enable row level security;
 alter table public.billing_events enable row level security;
 alter table public.billing_mpp_payments enable row level security;
+alter table public.billing_link_wallets enable row level security;
+alter table public.billing_link_oauth_states enable row level security;
 
 create policy "Users read their own billing customer"
   on public.billing_customers for select to authenticated
@@ -75,7 +101,8 @@ create policy "Users read their own purchases"
 -- Explicit grants, so access doesn't depend on the project's default privileges.
 revoke all on
   public.billing_customers, public.billing_subscriptions, public.billing_purchases,
-  public.billing_events, public.billing_mpp_payments
+  public.billing_events, public.billing_mpp_payments,
+  public.billing_link_wallets, public.billing_link_oauth_states
   from anon, authenticated;
 
 grant select on
@@ -84,5 +111,6 @@ grant select on
 
 grant select, insert, update, delete on
   public.billing_customers, public.billing_subscriptions, public.billing_purchases,
-  public.billing_events, public.billing_mpp_payments
+  public.billing_events, public.billing_mpp_payments,
+  public.billing_link_wallets, public.billing_link_oauth_states
   to service_role;

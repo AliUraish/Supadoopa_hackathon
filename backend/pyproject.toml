@@ -11,6 +11,9 @@ dependencies = [
     # Majors pinned on purpose: both SDKs change shapes between releases.
     "stripe>=16,<17",
     "pympp[stripe]>=0.11,<0.12",
+    "anthropic>=1.11,<2",
+    "playwright>=1.63,<2",
+    "mcp>=2.3,<3",
 ]
 
 [dependency-groups]

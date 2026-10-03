@@ -75,6 +75,8 @@ def test_paid_request_is_served_with_a_receipt(client, payments):
     params = payments.created[0]["params"]
     assert params["amount"] == 50 and params["currency"] == "usd" and params["confirm"] is True
     assert params["shared_payment_granted_token"] == "spt_test_123"
+    # Current Stripe API versions reject this; pympp 0.11 sent it (see StripeChargeIntent).
+    assert "payment_method_types" not in params
     assert payments.store.mpp_payments["pi_1"]["resource"] == ROUTE
 
 

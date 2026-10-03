@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>City Library · Catalog and holds</title>
+<style>
+  :root {
+    --navy: #1d3557; --navy-dark: #13243c; --gold: #c9a227; --paper: #f5f2ea; --ink: #1f2933;
+    --muted: #5f6b7a; --line: #d9d3c4; --green: #2f6f3e; --red: #a8322d;
+  }
+  * { box-sizing: border-box }
+  body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.6 system-ui, sans-serif }
+  header { background: var(--navy); color: #fff; border-bottom: 4px solid var(--gold) }
+  .bar {
+    max-width: 1000px; margin: 0 auto; padding: 16px; display: flex; align-items: center;
+    justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { margin: 0; display: flex; align-items: center; gap: 12px;
+    font: 600 24px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .02em }
+  .brand small { display: block; font: 13px system-ui, sans-serif; opacity: .75; letter-spacing: 0 }
+  nav a { color: #fff; text-decoration: none; margin-left: 18px; font-weight: 600 }
+  nav a:hover { text-decoration: underline; text-decoration-color: var(--gold) }
+  main {
+    max-width: 1000px; margin: 28px auto 40px; padding: 0 16px;
+    display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; align-items: start;
+  }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 22px; margin-bottom: 20px }
+  h2 { margin: 0 0 12px; font: 600 22px/1.25 Georgia, "Times New Roman", serif; color: var(--navy) }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px }
+  input, textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px;
+    font: inherit; color: var(--ink); background: #fff;
+  }
+  textarea { min-height: 110px; resize: vertical }
+  input:focus, textarea:focus, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px }
+  button {
+    margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 4px; cursor: pointer;
+    background: var(--navy); color: #fff; font: inherit; font-weight: 600;
+  }
+  button:hover { background: var(--navy-dark) }
+  button:disabled { background: #c9ced6; color: #4b5563; cursor: not-allowed }
+  .search { display: flex; gap: 8px; align-items: flex-end }
+  .search > div { flex: 1 }
+  .search button { margin: 0 }
+  #books { list-style: none; margin: 8px 0 0; padding: 0 }
+  .book { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line) }
+  .book .info { flex: 1; min-width: 0 }
+  .book strong { display: block; font: 600 18px/1.3 Georgia, "Times New Roman", serif }
+  .book .meta { color: var(--muted); font-size: 14px }
+  .avail { font-size: 13px; font-weight: 600; color: var(--green); white-space: nowrap }
+  .avail.none { color: var(--red) }
+  .book button { margin: 0; padding: 8px 14px; font-size: 14px; white-space: nowrap }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0) }
+  .muted { color: var(--muted) } .hidden { display: none }
+  #hold { border-left: 4px solid var(--gold) }
+  #hold-book { font: italic 18px Georgia, serif; margin: 0 }
+  .ok { color: var(--green); font-weight: 700 } .err { color: var(--red) }
+  .hours { margin: 0; padding: 0; list-style: none } .hours li { display: flex; justify-content: space-between }
+  @media (max-width: 760px) {
+    main { grid-template-columns: minmax(0, 1fr) } nav a { margin: 0 16px 0 0 }
+    .book { flex-wrap: wrap } .book .info { flex-basis: 100% } .avail { flex: 1 }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <p class="brand">
+      <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 12 16 5l12 7M6 12v13M11 12v13M16 12v13M21 12v13M26 12v13M3 27h26"/>
+      </svg>
+      <span>City Library<small>Free to all since 1902</small></span>
+    </p>
+    <nav aria-label="Main"><a href="#catalog">Catalog</a><a href="#contact">Contact us</a></nav>
+  </div>
+</header>
+<main>
+  <div>
+    <section class="panel" id="catalog" aria-labelledby="catalog-title">
+      <h2 id="catalog-title">Search the catalog</h2>
+      <form id="search-form" class="search" role="search" novalidate>
+        <div><label for="q">Title or author</label>
+          <input id="q" name="q" type="search" placeholder="e.g. Austen, Dracula"></div>
+        <button id="search" type="submit">Search</button>
+      </form>
+      <p id="results-msg" class="muted" aria-live="polite"></p>
+      <ul id="books" aria-label="Search results"></ul>
+    </section>
+    <section class="panel hidden" id="hold" aria-labelledby="hold-title">
+      <h2 id="hold-title">Place a hold</h2>
+      <p id="hold-book"></p>
+      <form id="hold-form" novalidate>
+        <label for="name">Full name</label><input id="name" name="name" autocomplete="name">
+        <label for="card">Library card number</label>
+        <input id="card" name="card" inputmode="numeric" autocomplete="off">
+        <label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email">
+        <button id="confirm-hold" type="submit">Confirm hold</button>
+      </form>
+      <p id="result" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+  <aside>
+    <section class="panel" id="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact us</h2>
+      <p class="muted">Questions about your card, a lost book or an event? Write to us.</p>
+      <form id="contact-form" novalidate>
+        <label for="contact-name">Your name</label>
+        <input id="contact-name" name="name" autocomplete="name">
+        <label for="contact-email">Email</label>
+        <input id="contact-email" name="email" type="email" autocomplete="email">
+        <label for="contact-message">Message</label>
+        <textarea id="contact-message" name="message"></textarea>
+        <button id="send" type="submit">Send message</button>
+      </form>
+      <p id="contact-result" role="status" aria-live="polite"></p>
+    </section>
+    <section class="panel" aria-labelledby="hours-title">
+      <h2 id="hours-title">Opening hours</h2>
+      <ul class="hours"><li><span>Mon–Thu</span><span>9:00–20:00</span></li>
+        <li><span>Fri–Sat</span><span>9:00–17:00</span></li><li><span>Sun</span><span>Closed</span></li></ul>
+    </section>
+  </aside>
+</main>
+<script>
+/*CLIENT*/
+let chosen = null;
+let latest = 0;
+async function runSearch() {
+  const mine = ++latest;
+  $('results-msg').textContent = 'Searching…';
+  try {
+    const books = await client.search($('q').value.trim());
+    if (mine !== latest) return;
+    $('results-msg').textContent = books.length
+      ? `${books.length} title${books.length === 1 ? '' : 's'} found` : 'No titles match your search.';
+    $('books').innerHTML = books.map((b) => `<li class="book">
+      <div class="info"><strong>${esc(b.title)}</strong>
+        <span class="meta">${esc(b.author)} · ${esc(b.year)}</span></div>
+      <span class="avail${b.available ? '' : ' none'}">${b.available} of ${b.copies} available</span>
+      <button type="button" data-id="${esc(b.id)}" data-title="${esc(b.title)}"${b.available ? '' : ' disabled'}>
+        ${b.available ? 'Place hold' : 'All copies on hold'}<span class="sr-only"> on ${esc(b.title)}</span>
+      </button></li>`).join('');
+  } catch (err) {
+    if (mine === latest) $('results-msg').textContent = 'Search failed: ' + err.message;
+  }
+}
+$('search-form').onsubmit = (e) => { e.preventDefault(); runSearch(); };
+$('books').onclick = (e) => {
+  const picked = e.target.closest('button');
+  if (!picked || picked.disabled) return;
+  chosen = { id: picked.dataset.id, title: picked.dataset.title };
+  $('hold-book').textContent = chosen.title;
+  $('result').textContent = '';
+  $('hold').classList.remove('hidden');
+  $('hold').scrollIntoView({ block: 'center' });
+  $('name').focus({ preventScroll: true });
+};
+$('hold-form').onsubmit = async (e) => {
+  e.preventDefault();
+  if (!chosen) return;
+  const r = await client.hold(chosen.id, $('name').value, $('card').value, $('email').value);
+  $('result').className = r.error ? 'err' : 'ok';
+  if (r.error) { $('result').textContent = failure('place the hold', r.error); return; }
+  $('result').textContent =
+    `Hold placed! "${r.title}" will be ready for pickup by ${r.pickup}. Reference ${r.id}.`;
+  chosen = null;
+  runSearch();
+};
+$('contact-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const email = $('contact-email').value;
+  const r = await client.contact($('contact-name').value, email, $('contact-message').value);
+  $('contact-result').className = r.error ? 'err' : 'ok';
+  $('contact-result').textContent = r.error ? failure('send your message', r.error)
+    : `Message sent! We will reply to ${email.trim()} within two working days. Reference ${r.id}.`;
+  if (!r.error) $('contact-message').value = '';
+};
+runSearch();
+</script>
+</body>
+</html>

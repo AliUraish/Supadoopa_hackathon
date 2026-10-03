@@ -186,6 +186,37 @@ def sync_webhook(client: stripe.StripeClient, url: str) -> None:
         print("\n  Copy the signing secret from Dashboard > Developers > Webhooks.\n")
 
 
+def sync_promotions(client: stripe.StripeClient) -> None:
+    for promotion in catalog.PROMOTIONS:
+        coupon_id = f"promo_{promotion.code.lower()}"
+        try:
+            coupon = client.v1.coupons.retrieve(coupon_id).to_dict()
+            if coupon.get("percent_off") != promotion.percent_off:
+                _say("warning", f"coupon {coupon_id} differs from catalog; coupons are immutable")
+        except stripe.InvalidRequestError as error:
+            if error.code != "resource_missing":
+                raise
+            client.v1.coupons.create(
+                {
+                    "id": coupon_id,
+                    "name": promotion.code,
+                    "percent_off": promotion.percent_off,
+                    "duration": promotion.duration,
+                }
+            )
+        found = client.v1.promotion_codes.list({"code": promotion.code, "limit": 1}).data
+        if not found:
+            client.v1.promotion_codes.create(
+                {"promotion": {"type": "coupon", "coupon": coupon_id}, "code": promotion.code}
+            )
+            _say("created", f"promo code {promotion.code} ({promotion.percent_off}% off)")
+        elif not found[0].active:
+            client.v1.promotion_codes.update(found[0].id, {"active": True})
+            _say("updated", f"promo code {promotion.code} (reactivated)")
+        else:
+            _say("ok", f"promo code {promotion.code}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -213,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         for price in product.prices:
             price_ids[price.lookup_key] = sync_price(client, product, price)
     sync_portal(client, price_ids)
+    sync_promotions(client)
     if args.payment_links:
         sync_payment_links(client, price_ids)
     if args.webhook_url:

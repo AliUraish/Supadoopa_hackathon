@@ -28,10 +28,12 @@ from app.billing import config
 config.Settings.model_config["env_file"] = None
 
 from app.billing import auth, mpp, routes, store, stripe_client  # noqa: E402
+from app.doorway import store as doorway_store  # noqa: E402
 from app.main import app  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MIGRATION = REPO_ROOT / "supabase" / "migrations" / "20261003200000_billing.sql"
+MIGRATIONS = sorted((REPO_ROOT / "supabase" / "migrations").glob("*.sql"))
+MIGRATION = MIGRATIONS[0]  # billing (kept for older scripts)
 STUB_SQL = Path(__file__).parent / "sql" / "supabase_stub.sql"
 JWT_SECRET = "test-jwt-secret-that-is-at-least-32-characters"
 
@@ -69,6 +71,7 @@ def clear_caches() -> None:
     store._supabase_store.cache_clear()
     routes._price_ids.clear()
     mpp._local_references.clear()
+    doorway_store.doorway_store_cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -210,9 +213,10 @@ def postgrest(tmp_path_factory):
             "-q",
         ]
         subprocess.run([*psql, "-f", str(STUB_SQL)], **quiet)
-        result = subprocess.run([*psql, "-f", str(MIGRATION)], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(f"migration failed:\n{result.stderr}")
+        for migration in MIGRATIONS:
+            result = subprocess.run([*psql, "-f", str(migration)], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"{migration.name} failed:\n{result.stderr}")
 
         env = {
             **os.environ,
@@ -244,7 +248,8 @@ def pg_store(postgrest):
             *postgrest["psql"],
             "-c",
             "truncate public.billing_customers, public.billing_subscriptions, "
-            "public.billing_purchases, public.billing_events, public.billing_mpp_payments; "
+            "public.billing_purchases, public.billing_events, public.billing_mpp_payments, "
+            "public.billing_link_wallets, public.billing_link_oauth_states; "
             "delete from auth.users; "
             f"insert into auth.users (id, email) values ('{USER_ID}', 'dev@example.com'), "
             f"('{OTHER_USER_ID}', 'other@example.com');",

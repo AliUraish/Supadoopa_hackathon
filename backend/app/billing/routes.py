@@ -13,6 +13,7 @@ from . import catalog
 from .auth import User, current_user
 from .config import get_settings
 from .entitlements import ACTIVE_STATUSES, Entitlements, get_entitlements
+from .invoices import InvoiceLine, send_invoice
 from .store import BillingStore, get_store
 from .stripe_client import get_stripe
 
@@ -76,9 +77,17 @@ async def ensure_customer(user: User, store: BillingStore) -> str:
     params: dict = {"metadata": {"supabase_user_id": user.id}}
     if user.email:
         params["email"] = user.email
-    customer = await get_stripe().v1.customers.create_async(
+    customers = get_stripe().v1.customers
+    # The idempotency key stops double-clicks creating two customers...
+    customer = await customers.create_async(
         params, {"idempotency_key": f"billing-customer-{user.id}"}
     )
+    # ...but for 24h it also replays a customer that was deleted since. Start fresh then.
+    response = getattr(customer, "last_response", None)
+    if response is not None and response.headers.get("Idempotent-Replayed") == "true":
+        current = await customers.retrieve_async(customer.id)
+        if getattr(current, "deleted", False):
+            customer = await customers.create_async(params)
     return await store.save_customer(user.id, customer.id, user.email)
 
 
@@ -207,3 +216,111 @@ async def my_billing(
 ) -> Entitlements:
     """Current plan, subscription and one-time purchases for the signed-in user."""
     return await get_entitlements(user.id, store)
+
+
+class OneTimeIn(BaseModel):
+    lookup_key: str
+    quantity: int = Field(1, ge=1, le=100)
+
+
+def _one_time_price(lookup_key: str) -> catalog.Price:
+    price = catalog.get_price(lookup_key)
+    if price is None:
+        raise HTTPException(404, {"error": "unknown_price", "lookup_key": lookup_key})
+    if price.recurring:
+        raise HTTPException(
+            400, {"error": "recurring_price", "fix": "use /billing/checkout for subscriptions"}
+        )
+    return price
+
+
+class PaymentIntentOut(BaseModel):
+    id: str
+    client_secret: str
+    publishable_key: str | None
+    amount: int
+    currency: str
+
+
+@router.post("/payment-intent")
+async def create_payment_intent(
+    body: OneTimeIn,
+    user: User = Depends(current_user),
+    store: BillingStore = Depends(get_store),
+) -> PaymentIntentOut:
+    """One-time purchase with Stripe Elements (your own payment form).
+
+    The frontend mounts the Payment Element with `client_secret` and calls
+    stripe.confirmPayment(); the payment_intent.succeeded webhook records the purchase.
+    """
+    price = _one_time_price(body.lookup_key)
+    customer_id = await ensure_customer(user, store)
+    intent = await get_stripe().v1.payment_intents.create_async(
+        {
+            "amount": price.unit_amount * body.quantity,
+            "currency": price.currency,
+            "customer": customer_id,
+            "automatic_payment_methods": {"enabled": True},
+            "metadata": {
+                "purchase_source": "elements",
+                "supabase_user_id": user.id,
+                "lookup_key": body.lookup_key,
+            },
+        }
+    )
+    return PaymentIntentOut(
+        id=intent.id,
+        client_secret=intent.client_secret,
+        publishable_key=get_settings().stripe_publishable_key,
+        amount=intent.amount,
+        currency=intent.currency,
+    )
+
+
+class InvoiceIn(OneTimeIn):
+    days_until_due: int = Field(7, ge=1, le=90)
+
+
+@router.post("/invoice")
+async def create_invoice(
+    body: InvoiceIn,
+    user: User = Depends(current_user),
+    store: BillingStore = Depends(get_store),
+) -> dict:
+    """Pay later: email the user a Stripe invoice for a one-time price.
+
+    Recorded as a pending purchase now; invoice.paid flips it to paid.
+    """
+    price = _one_time_price(body.lookup_key)
+    customer_id = await ensure_customer(user, store)
+    invoice = await send_invoice(
+        customer_id=customer_id,
+        lines=[
+            InvoiceLine(
+                description=body.lookup_key,
+                amount=price.unit_amount * body.quantity,
+                currency=price.currency,
+                price_id=await price_id_for(body.lookup_key),
+                quantity=body.quantity,
+            )
+        ],
+        days_until_due=body.days_until_due,
+        metadata={
+            "purchase_source": "invoice",
+            "supabase_user_id": user.id,
+            "lookup_key": body.lookup_key,
+        },
+    )
+    await store.upsert_purchase(
+        {
+            "id": invoice["id"],
+            "user_id": user.id,
+            "stripe_customer_id": customer_id,
+            "source": "invoice",
+            "price_lookup_key": body.lookup_key,
+            "amount_total": invoice["amount_due"],
+            "currency": invoice["currency"],
+            "status": "pending",
+        }
+    )
+    return invoice

@@ -13,8 +13,10 @@ from .stripe_client import get_stripe
 @dataclass(frozen=True)
 class InvoiceLine:
     description: str
-    amount: int  # smallest currency unit
+    amount: int  # smallest currency unit (ignored when price_id is set)
     currency: str = "usd"
+    price_id: str | None = None  # bill a catalog price instead of a free-form amount
+    quantity: int = 1
 
 
 async def send_invoice(
@@ -24,6 +26,7 @@ async def send_invoice(
     customer_id: str | None = None,
     days_until_due: int = 7,
     memo: str | None = None,
+    metadata: dict[str, str] | None = None,
 ) -> dict:
     if not lines:
         raise ValueError("an invoice needs at least one line")
@@ -44,25 +47,25 @@ async def send_invoice(
         "collection_method": "send_invoice",
         "days_until_due": days_until_due,
         "currency": lines[0].currency,
+        "metadata": metadata or {},
     }
     if memo:
         params["description"] = memo
     invoice = await stripe.invoices.create_async(params)
     for line in lines:
-        await stripe.invoice_items.create_async(
-            {
-                "customer": customer_id,
-                "invoice": invoice.id,
-                "amount": line.amount,
-                "currency": line.currency,
-                "description": line.description,
-            }
-        )
+        item: dict = {"customer": customer_id, "invoice": invoice.id, "quantity": line.quantity}
+        if line.price_id:
+            item["pricing"] = {"price": line.price_id}
+        else:
+            item.update(amount=line.amount, currency=line.currency, description=line.description)
+            item.pop("quantity")  # amount is the line total
+        await stripe.invoice_items.create_async(item)
     invoice = await stripe.invoices.finalize_invoice_async(invoice.id)
     invoice = await stripe.invoices.send_invoice_async(invoice.id)
     return {
         "id": invoice.id,
         "status": invoice.status,
         "amount_due": invoice.amount_due,
+        "currency": invoice.currency,
         "hosted_invoice_url": invoice.hosted_invoice_url,
     }

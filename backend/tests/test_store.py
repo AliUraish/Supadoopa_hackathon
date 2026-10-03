@@ -94,3 +94,47 @@ async def test_rls_users_only_read_their_own_rows(pg_store, postgrest):
         assert write.status_code in (401, 403)
         assert (await http.get("/billing_events", headers=as_user)).status_code in (401, 403)
         assert (await http.get("/billing_subscriptions")).status_code in (401, 403)
+
+
+async def test_refunds_and_disputes_find_the_purchase_by_payment_intent(pg_store):
+    row = {
+        "id": "pi_1",
+        "user_id": USER_ID,
+        "payment_intent_id": "pi_1",
+        "source": "elements",
+        "amount_total": 500,
+        "status": "paid",
+    }
+    await pg_store.upsert_purchase(row)
+    assert await pg_store.update_purchase_by_payment_intent(
+        "pi_1", {"status": "refunded", "amount_refunded": 500}
+    )
+    assert await pg_store.update_purchase_by_payment_intent("pi_unknown", {"status": "x"}) is False
+    [purchase] = await pg_store.list_purchases(USER_ID)
+    assert purchase["status"] == "refunded" and purchase["amount_refunded"] == 500
+    with pytest.raises(StoreError):  # source is constrained
+        await pg_store.upsert_purchase(
+            {**row, "id": "pi_2", "payment_intent_id": "pi_2", "source": "somewhere"}
+        )
+
+
+async def test_link_oauth_state_is_single_use(pg_store):
+    await pg_store.save_link_oauth_state("st_1", USER_ID, "verifier")
+    assert (await pg_store.pop_link_oauth_state("st_1"))["code_verifier"] == "verifier"
+    assert await pg_store.pop_link_oauth_state("st_1") is None
+
+
+async def test_link_wallet_upserts_per_user(pg_store):
+    row = {
+        "user_id": USER_ID,
+        "access_token": "a1",
+        "refresh_token": "r1",
+        "expires_at": "2026-10-03T20:00:00+00:00",
+        "scope": "payment_methods.agentic",
+    }
+    await pg_store.save_link_wallet(row)
+    await pg_store.save_link_wallet({**row, "access_token": "a2", "refresh_token": "r2"})
+    wallet = await pg_store.get_link_wallet(USER_ID)
+    assert (wallet["access_token"], wallet["refresh_token"]) == ("a2", "r2")
+    await pg_store.delete_link_wallet(USER_ID)
+    assert await pg_store.get_link_wallet(USER_ID) is None

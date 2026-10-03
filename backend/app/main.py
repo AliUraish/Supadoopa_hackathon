@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import billing
 from app.billing import Receipt, User
 from app.billing.config import get_settings
+from app.doorway.api import install as doorway_install
 
 app = FastAPI(title="Supabase Hackathon API", version="0.1.0")
 
@@ -23,13 +24,17 @@ app.add_middleware(
         }
     ),
     # Vercel preview deployments of the frontend project.
-    allow_origin_regex=r"https://supabase-hackathon-[a-z0-9-]+-aliuraishmirani-4593s-projects\.vercel\.app",
+    allow_origin_regex=(
+        r"https://supabase-hackathon-[a-z0-9-]+-aliuraishmirani-4593s-projects\.vercel\.app"
+        r"|http://(localhost|127\.0\.0\.1):\d+"  # any local dev port
+    ),
     allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"],
     expose_headers=["Payment-Receipt", "WWW-Authenticate"],
 )
 
 billing.install(app)
+doorway_install(app)
 
 
 @app.get("/health")
@@ -50,3 +55,8 @@ async def paid_call(
     receipt: Receipt = Depends(billing.paid("0.50", description="Example call")),
 ) -> dict:
     return {"result": "paid content", "payment": receipt.reference}
+
+
+@app.get("/examples/credits", tags=["examples"])
+async def credits_only(user: User = Depends(billing.require_purchase("credits_100"))) -> dict:
+    return {"message": "Thanks for buying credits."}

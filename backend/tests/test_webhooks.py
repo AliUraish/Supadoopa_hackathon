@@ -63,11 +63,22 @@ class FakeStripe:
         async def list_line_items(session_id, params=None):
             return line_items
 
+        self.charge = {"disputed": False, "refunded": False, "amount_refunded": 0}
+        self.dispute_status = "needs_response"
+
+        async def retrieve_intent(intent_id, params=None):
+            return stripe_object({"id": intent_id, "latest_charge": self.charge})
+
+        async def list_disputes(params=None):
+            return SimpleNamespace(data=[SimpleNamespace(status=self.dispute_status)])
+
         self.v1 = SimpleNamespace(
             subscriptions=SimpleNamespace(retrieve_async=retrieve_async),
             checkout=SimpleNamespace(
                 sessions=SimpleNamespace(line_items=SimpleNamespace(list_async=list_line_items))
             ),
+            payment_intents=SimpleNamespace(retrieve_async=retrieve_intent),
+            disputes=SimpleNamespace(list_async=list_disputes),
         )
 
 

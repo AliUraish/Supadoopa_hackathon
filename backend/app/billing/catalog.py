@@ -56,6 +56,17 @@ PRODUCTS: tuple[Product, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class Promotion:
+    code: str  # what customers type at Checkout
+    percent_off: int
+    duration: Literal["once", "forever"] = "once"
+
+
+# Checkout shows a promo-code field (allow_promotion_codes); sync creates these.
+PROMOTIONS: tuple[Promotion, ...] = (Promotion("HACKATHON", 20),)
+
+
 def get_price(lookup_key: str) -> Price | None:
     for product in PRODUCTS:
         for price in product.prices:

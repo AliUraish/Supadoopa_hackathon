@@ -35,6 +35,24 @@ class BillingStore(Protocol):
 
     async def list_purchases(self, user_id: str) -> list[dict[str, Any]]: ...
 
+    async def update_purchase_by_payment_intent(
+        self, payment_intent_id: str, fields: dict[str, Any]
+    ) -> bool:
+        """Patch the purchase paid by this PaymentIntent. False if there is none."""
+        ...
+
+    async def save_link_oauth_state(self, state: str, user_id: str, code_verifier: str) -> None: ...
+
+    async def pop_link_oauth_state(self, state: str) -> dict[str, Any] | None:
+        """Consume a pending Link authorization (single use)."""
+        ...
+
+    async def save_link_wallet(self, row: dict[str, Any]) -> None: ...
+
+    async def get_link_wallet(self, user_id: str) -> dict[str, Any] | None: ...
+
+    async def delete_link_wallet(self, user_id: str) -> None: ...
+
     async def claim_event(self, event_id: str, event_type: str) -> bool:
         """Record a webhook event. False if it was already processed."""
         ...
@@ -88,11 +106,11 @@ class SupabaseStore:
         )
         return bool(inserted)
 
-    async def _upsert(self, table: str, row: dict[str, Any]) -> None:
+    async def _upsert(self, table: str, row: dict[str, Any], conflict: str = "id") -> None:
         await self._request(
             "POST",
             table,
-            params={"on_conflict": "id"},
+            params={"on_conflict": conflict},
             json=row,
             prefer="resolution=merge-duplicates,return=minimal",
         )
@@ -140,6 +158,46 @@ class SupabaseStore:
             params={"select": "*", "user_id": f"eq.{user_id}", "order": "created_at.desc"},
         )
 
+    async def update_purchase_by_payment_intent(
+        self, payment_intent_id: str, fields: dict[str, Any]
+    ) -> bool:
+        updated = await self._request(
+            "PATCH",
+            "billing_purchases",
+            params={"payment_intent_id": f"eq.{payment_intent_id}"},
+            json=fields,
+            prefer="return=representation",
+        )
+        return bool(updated)
+
+    async def save_link_oauth_state(self, state: str, user_id: str, code_verifier: str) -> None:
+        await self._request(
+            "POST",
+            "billing_link_oauth_states",
+            json={"state": state, "user_id": user_id, "code_verifier": code_verifier},
+        )
+
+    async def pop_link_oauth_state(self, state: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "DELETE",
+            "billing_link_oauth_states",
+            params={"state": f"eq.{state}"},
+            prefer="return=representation",
+        )
+        return rows[0] if rows else None
+
+    async def save_link_wallet(self, row: dict[str, Any]) -> None:
+        await self._upsert("billing_link_wallets", row, conflict="user_id")
+
+    async def get_link_wallet(self, user_id: str) -> dict[str, Any] | None:
+        rows = await self._request(
+            "GET", "billing_link_wallets", params={"select": "*", "user_id": f"eq.{user_id}"}
+        )
+        return rows[0] if rows else None
+
+    async def delete_link_wallet(self, user_id: str) -> None:
+        await self._request("DELETE", "billing_link_wallets", params={"user_id": f"eq.{user_id}"})
+
     async def claim_event(self, event_id: str, event_type: str) -> bool:
         return await self._insert_ignore(
             "billing_events", "id", {"id": event_id, "type": event_type}
@@ -161,6 +219,8 @@ class MemoryStore:
         self.purchases: dict[str, dict[str, Any]] = {}
         self.events: dict[str, str] = {}
         self.mpp_payments: dict[str, dict[str, Any]] = {}
+        self.link_states: dict[str, dict[str, Any]] = {}
+        self.link_wallets: dict[str, dict[str, Any]] = {}
 
     async def get_customer_id(self, user_id: str) -> str | None:
         row = self.customers.get(user_id)
@@ -190,6 +250,30 @@ class MemoryStore:
 
     async def list_purchases(self, user_id: str) -> list[dict[str, Any]]:
         return [r for r in self.purchases.values() if r.get("user_id") == user_id]
+
+    async def update_purchase_by_payment_intent(
+        self, payment_intent_id: str, fields: dict[str, Any]
+    ) -> bool:
+        for row in self.purchases.values():
+            if row.get("payment_intent_id") == payment_intent_id:
+                row.update(fields)
+                return True
+        return False
+
+    async def save_link_oauth_state(self, state: str, user_id: str, code_verifier: str) -> None:
+        self.link_states[state] = {"user_id": user_id, "code_verifier": code_verifier}
+
+    async def pop_link_oauth_state(self, state: str) -> dict[str, Any] | None:
+        return self.link_states.pop(state, None)
+
+    async def save_link_wallet(self, row: dict[str, Any]) -> None:
+        self.link_wallets[row["user_id"]] = dict(row)
+
+    async def get_link_wallet(self, user_id: str) -> dict[str, Any] | None:
+        return self.link_wallets.get(user_id)
+
+    async def delete_link_wallet(self, user_id: str) -> None:
+        self.link_wallets.pop(user_id, None)
 
     async def claim_event(self, event_id: str, event_type: str) -> bool:
         if event_id in self.events:

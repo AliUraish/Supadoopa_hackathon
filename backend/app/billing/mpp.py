@@ -17,8 +17,10 @@ import hmac
 import logging
 from functools import lru_cache
 
+import stripe
 from fastapi import FastAPI, HTTPException, Request, Response
 from mpp import Receipt
+from mpp.errors import VerificationFailedError
 from mpp.methods.stripe import ChargeIntent
 from mpp.methods.stripe import stripe as stripe_method
 from mpp.server import Mpp
@@ -26,7 +28,7 @@ from mpp.server._defaults import detect_realm
 from starlette.responses import Response as StarletteResponse
 
 from .config import NotConfigured, get_settings
-from .store import get_store
+from .store import StoreError, get_store
 from .stripe_client import get_stripe
 
 log = logging.getLogger(__name__)
@@ -40,6 +42,34 @@ class PaymentChallenge(Exception):
 
     def __init__(self, response: StarletteResponse) -> None:
         self.response = response
+
+
+class StripeChargeIntent(ChargeIntent):
+    """pympp 0.11's charge, fixed for current Stripe API versions.
+
+    Upstream sends `payment_method_types`, which Stripe now rejects ("no longer
+    supported"), and accepts idempotent replays of an already-used credential.
+    Both are fixed in pympp 0.12, which isn't on PyPI yet.
+    """
+
+    async def _create_with_client(self, client, challenge_id, request, spt, metadata):
+        try:
+            intent = await client.v1.payment_intents.create_async(
+                {
+                    "amount": int(request.amount),
+                    "currency": request.currency,
+                    "confirm": True,
+                    "metadata": metadata,
+                    "shared_payment_granted_token": spt,
+                },
+                {"idempotency_key": f"mpp_{challenge_id}_{spt}"},
+            )
+        except stripe.StripeError as error:
+            raise VerificationFailedError(error.user_message or "Stripe payment failed") from error
+        response = getattr(intent, "last_response", None)
+        if response is not None and response.headers.get("Idempotent-Replayed") == "true":
+            raise VerificationFailedError("Payment credential was already used")
+        return {"id": intent.id, "status": intent.status}
 
 
 @lru_cache
@@ -72,7 +102,7 @@ def get_mpp() -> Mpp:
             payment_method_types=["card"],
             currency="usd",
             decimals=2,
-            intents={"charge": ChargeIntent(client=get_stripe())},
+            intents={"charge": StripeChargeIntent(client=get_stripe())},
         ),
         realm=settings.mpp_realm or detect_realm(),
         secret_key=secret,
@@ -82,21 +112,27 @@ def get_mpp() -> Mpp:
 _local_references: set[str] = set()
 
 
+def _claim_locally(reference: str) -> bool:
+    if reference in _local_references:
+        return False
+    _local_references.add(reference)
+    return True
+
+
 async def _claim_reference(row: dict) -> bool:
     """A credential replayed within its 5-minute window must not unlock a second call.
 
-    pympp 0.11 accepts Stripe's idempotent replay of the same PaymentIntent (fixed
-    upstream in 0.12, not yet on PyPI), so we enforce single use ourselves.
+    Second layer behind StripeChargeIntent's Idempotent-Replayed check. It also records
+    the payment. This runs after the charge succeeded, so if the database is unavailable
+    we fall back to a per-process guard rather than take money and then fail.
     """
     try:
-        store = get_store()
+        return await get_store().claim_mpp_payment(row)
     except NotConfigured:
         log.warning("Supabase not configured: MPP replay guard is per-process only")
-        if row["reference"] in _local_references:
-            return False
-        _local_references.add(row["reference"])
-        return True
-    return await store.claim_mpp_payment(row)
+    except StoreError:
+        log.exception("could not record MPP payment %s; using per-process guard", row["reference"])
+    return _claim_locally(row["reference"])
 
 
 def paid(amount: str, *, description: str | None = None):
@@ -129,7 +165,12 @@ def paid(amount: str, *, description: str | None = None):
         response.headers["Payment-Receipt"] = receipt.to_payment_receipt()
         return receipt
 
+    PAID_DEPENDENCIES[dependency] = {"amount": amount, "description": description}
     return dependency
+
+
+# paid() dependency -> its price, so /llms.txt can list paid endpoints for agents.
+PAID_DEPENDENCIES: dict = {}
 
 
 def install_mpp(app: FastAPI) -> None:

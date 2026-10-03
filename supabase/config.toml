@@ -416,8 +416,19 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
-[compute.hello-check]
+# Doorway demo target: a human-only booking site (private JSON API, v1/v2 switch).
+[compute.clinic]
 runtime = "node"
 size = "2gb"
 exposure = "public"
 exclude = [".env", ".env.*", ".git", "node_modules", "*.log"]
+
+# Doorway sandboxes: each instance runs DOORWAY_SANDBOXES workers with headless Chromium that
+# (live view of their browsers at /compute/v1/doorway-sandbox/)
+# claim discover/verify/heal/optimize/race jobs from the shared queue in this project's Postgres.
+[compute.doorway-sandbox]
+runtime = "dockerfile"
+size = "4gb"
+exposure = "public" # serves the live view of the sandbox browsers on $PORT
+source = "backend"
+exclude = [".env", ".env.*", ".git", ".venv", ".devdb", "tests", "demo_sites", "scripts", "__pycache__", ".pytest_cache", ".ruff_cache"]

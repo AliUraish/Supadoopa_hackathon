@@ -1,0 +1,332 @@
+@import "tailwindcss";
+
+/* ── Doorway pixel theme: Supabase black + green, CRT-flavoured ───────────── */
+
+@theme {
+  --color-bg: #060807;
+  --color-bg-2: #0b0e0c;
+  --color-panel: #0f1311;
+  --color-panel-2: #151a17;
+  --color-panel-3: #1b211e;
+  --color-line: #232b27;
+  --color-line-2: #34423b;
+  --color-text: #e3f5ea;
+  --color-muted: #8fa198;
+  --color-faint: #5a6a62;
+  --color-green: #3ecf8e;
+  --color-green-hi: #8cffc6;
+  --color-green-dim: #24b47e;
+  --color-green-deep: #0e3b27;
+  --color-green-ink: #03130b;
+  --color-red: #ff5f56;
+  --color-amber: #ffb224;
+  --color-blue: #4cb4ff;
+  --color-violet: #b18cff;
+  --color-gold: #f7d046;
+
+  /* Old scaffold names, kept so untouched pages still theme correctly. */
+  --color-background: #060807;
+  --color-foreground: #e3f5ea;
+
+  --font-pixel: var(--font-press-start), ui-monospace, monospace;
+  --font-term: var(--font-vt323), ui-monospace, monospace;
+  --font-sans: var(--font-vt323), ui-monospace, monospace;
+  --font-mono: var(--font-vt323), ui-monospace, monospace;
+
+  /* VT323 draws small: scale the type ramp up so text-sm etc. stay readable. */
+  --text-xs: 1rem;
+  --text-xs--line-height: 1.15;
+  --text-sm: 1.15rem;
+  --text-sm--line-height: 1.2;
+  --text-base: 1.3rem;
+  --text-base--line-height: 1.25;
+  --text-lg: 1.5rem;
+  --text-lg--line-height: 1.25;
+  --text-xl: 1.75rem;
+  --text-xl--line-height: 1.2;
+  --text-2xl: 2.1rem;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: 2.6rem;
+  --text-3xl--line-height: 1.1;
+  --text-4xl: 3.2rem;
+  --text-4xl--line-height: 1.05;
+
+  /* Pixels have no curves. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+
+  --animate-blink: px-blink 1s steps(2, start) infinite;
+  --animate-pulse-px: px-pulse 1.2s steps(3, end) infinite;
+  --animate-march: px-march 0.6s steps(4, end) infinite;
+}
+
+@keyframes px-blink {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes px-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes px-march {
+  to {
+    background-position: 16px 0;
+  }
+}
+@keyframes px-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes px-rise {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+html {
+  color-scheme: dark;
+  background: var(--color-bg);
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(circle at 50% -20%, rgba(62, 207, 142, 0.1), transparent 55%),
+    radial-gradient(rgba(62, 207, 142, 0.07) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    16px 16px;
+  color: var(--color-text);
+  font-family: var(--font-term);
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+/* CRT scanlines over everything (subtle enough for a projector). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 0, 0, 0.16) 3px,
+    transparent 4px
+  );
+}
+
+::selection {
+  background: var(--color-green);
+  color: var(--color-green-ink);
+}
+
+* {
+  scrollbar-color: var(--color-line-2) var(--color-bg-2);
+  scrollbar-width: thin;
+}
+
+:focus-visible {
+  outline: 2px dashed var(--color-green-hi);
+  outline-offset: 3px;
+}
+
+@layer base {
+  .font-pixel {
+    font-family: var(--font-pixel);
+    -webkit-font-smoothing: none;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  /* Notched 2px pixel border (no corner pixels), colour via --frame. */
+  .px-frame {
+    --frame: var(--color-line-2);
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame);
+  }
+
+  .px-panel {
+    --frame: var(--color-line-2);
+    background: var(--color-panel);
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame),
+      6px 6px 0 0 rgba(0, 0, 0, 0.55);
+  }
+
+  .px-inset {
+    --frame: var(--color-line);
+    background: var(--color-bg-2);
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame),
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .px-btn {
+    --btn-bg: var(--color-green);
+    --btn-fg: var(--color-green-ink);
+    --frame: #000;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-pixel);
+    -webkit-font-smoothing: none;
+    font-size: 10px;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 10px 14px;
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame),
+      inset -3px -3px 0 0 rgba(0, 0, 0, 0.35),
+      inset 3px 3px 0 0 rgba(255, 255, 255, 0.28);
+    transition: filter 80ms steps(2);
+  }
+  .px-btn:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+  .px-btn:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame),
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.35);
+  }
+  .px-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .px-btn--ghost {
+    --btn-bg: var(--color-panel-3);
+    --btn-fg: var(--color-text);
+    --frame: var(--color-line-2);
+  }
+  .px-btn--danger {
+    --btn-bg: var(--color-red);
+    --btn-fg: #1a0302;
+  }
+  .px-btn--warn {
+    --btn-bg: var(--color-amber);
+    --btn-fg: #1d1200;
+  }
+  .px-btn--sm {
+    font-size: 8px;
+    padding: 7px 9px;
+  }
+  .px-btn--lg {
+    font-size: 12px;
+    padding: 14px 20px;
+  }
+
+  .px-input {
+    --frame: var(--color-line-2);
+    width: 100%;
+    background: var(--color-bg-2);
+    color: var(--color-text);
+    font-family: var(--font-term);
+    font-size: 1.25rem;
+    line-height: 1.2;
+    padding: 6px 10px;
+    box-shadow:
+      0 -2px 0 0 var(--frame),
+      0 2px 0 0 var(--frame),
+      -2px 0 0 0 var(--frame),
+      2px 0 0 0 var(--frame),
+      inset 3px 3px 0 0 rgba(0, 0, 0, 0.55);
+    outline: none;
+  }
+  .px-input:focus {
+    --frame: var(--color-green);
+  }
+  .px-input::placeholder {
+    color: var(--color-faint);
+  }
+  select.px-input {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--color-green) 50%),
+      linear-gradient(135deg, var(--color-green) 50%, transparent 50%);
+    background-position:
+      calc(100% - 16px) 55%,
+      calc(100% - 11px) 55%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+  }
+
+  .px-glow {
+    text-shadow:
+      0 0 8px rgba(62, 207, 142, 0.55),
+      0 0 1px rgba(140, 255, 198, 0.8);
+  }
+
+  /* Animated dashed "wire" (workspace connections, live strips). */
+  .px-wire {
+    background-image: linear-gradient(90deg, var(--color-green) 50%, transparent 50%);
+    background-size: 16px 2px;
+    background-repeat: repeat-x;
+    animation: px-march 0.6s steps(4, end) infinite;
+  }
+
+  .px-rise {
+    animation: px-rise 180ms steps(3, end);
+  }
+
+  .px-spin {
+    animation: px-spin 1s steps(8, end) infinite;
+  }
+
+  .pixelated {
+    image-rendering: pixelated;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

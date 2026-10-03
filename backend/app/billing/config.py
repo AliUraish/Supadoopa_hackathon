@@ -32,11 +32,23 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = _env("STRIPE_WEBHOOK_SECRET")
     # Stripe profile ID (profile_test_… / profile_…), the MPP `networkId`.
     stripe_profile_id: str | None = _env("STRIPE_PROFILE_ID")
+    # Returned to the frontend for Stripe Elements; also the Link OAuth `key`.
+    stripe_publishable_key: str | None = _env(
+        "STRIPE_PUBLISHABLE_KEY", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
+    )
     # Only for tests (stripe-mock).
     stripe_api_base: str | None = _env("STRIPE_API_BASE")
 
+    # Link Agent Wallet OAuth client (issued by Stripe after the application form).
+    link_client_id: str | None = _env("LINK_CLIENT_ID")
+    link_client_secret: str | None = _env("LINK_CLIENT_SECRET")
+    # This backend's public URL; the Link OAuth callback lives under it.
+    api_url: str | None = _env("API_URL", "BILLING_API_URL")
+
     mpp_secret_key: str | None = _env("MPP_SECRET_KEY")
     mpp_realm: str | None = _env("MPP_REALM")
+    # Shared secret for services (e.g. the Doorway gateway) that call POST /mpp/charge.
+    mpp_gateway_secret: str | None = _env("MPP_GATEWAY_SECRET")
 
     supabase_url: str | None = _env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
     supabase_secret_key: str | None = _env("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY")
@@ -48,6 +60,16 @@ class Settings(BaseSettings):
     )
     # Only for tests (a bare PostgREST instead of <SUPABASE_URL>/rest/v1).
     supabase_rest_url: str | None = _env("SUPABASE_REST_URL")
+
+    # Doorway
+    anthropic_api_key: str | None = _env("ANTHROPIC_API_KEY")
+    doorway_model: str | None = _env("DOORWAY_MODEL")  # default chosen in app/doorway
+    # Local demos only: dashboard actions without a token run as a shared demo user.
+    doorway_demo_open: bool | None = _env("DOORWAY_DEMO_OPEN")
+    # Public URL of the sandboxes' live view (default: <SUPABASE_URL>/compute/v1/doorway-sandbox/).
+    doorway_live_url: str | None = _env("DOORWAY_LIVE_URL")
+    # x-admin-token for demo sites' /admin/version (break/reset).
+    demo_admin_token: str | None = _env("DEMO_ADMIN_TOKEN", "CLINIC_ADMIN_TOKEN")
 
     # Frontend origin: Checkout/portal redirect back here.
     app_url: str | None = _env("APP_URL", "NEXT_PUBLIC_APP_URL", "NEXT_PUBLIC_SITE_URL")
@@ -68,6 +90,10 @@ class Settings(BaseSettings):
     @property
     def public_app_url(self) -> str:
         return (self.app_url or DEFAULT_APP_URL).rstrip("/")
+
+    @property
+    def public_api_url(self) -> str:
+        return (self.api_url or "http://localhost:8000").rstrip("/")
 
     @property
     def stripe_live(self) -> bool:

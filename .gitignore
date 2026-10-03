@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 
@@ -31,3 +31,4 @@ supabase/.branches
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/

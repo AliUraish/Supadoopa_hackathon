@@ -25,3 +25,8 @@ as $$
 $$;
 
 grant usage on schema public to anon, authenticated, service_role;
+
+-- Realtime publication and Storage buckets, as Supabase provides them.
+create publication supabase_realtime;
+create schema storage;
+create table storage.buckets (id text primary key, name text not null, public boolean default false);

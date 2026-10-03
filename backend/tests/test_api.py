@@ -146,3 +146,33 @@ def test_current_user_asks_supabase_auth(client, memory_store, configure, monkey
     assert client.get("/billing/me", headers={"Authorization": "Bearer good"}).status_code == 200
     assert seen == {"url": "https://proj.supabase.co/auth/v1/user", "apikey": "sb_publishable_1"}
     assert client.get("/billing/me", headers={"Authorization": "Bearer bad"}).status_code == 401
+
+
+@pytest.mark.anyio
+async def test_replayed_deleted_customer_is_replaced(monkeypatch, memory_store):
+    from types import SimpleNamespace
+
+    from app.billing import routes
+
+    created = []
+
+    async def create_async(params, options=None):
+        created.append(options)
+        replayed = "true" if options else "false"
+        headers = {"Idempotent-Replayed": replayed}
+        return SimpleNamespace(
+            id=f"cus_{len(created)}", last_response=SimpleNamespace(headers=headers)
+        )
+
+    async def retrieve_async(customer_id):
+        return SimpleNamespace(id=customer_id, deleted=True)
+
+    fake = SimpleNamespace(
+        v1=SimpleNamespace(
+            customers=SimpleNamespace(create_async=create_async, retrieve_async=retrieve_async)
+        )
+    )
+    monkeypatch.setattr(routes, "get_stripe", lambda: fake)
+    user = auth.User(id=USER_ID, email="dev@example.com")
+    assert await routes.ensure_customer(user, memory_store) == "cus_2"
+    assert created[1] is None  # the retry is a plain create, without the stale key

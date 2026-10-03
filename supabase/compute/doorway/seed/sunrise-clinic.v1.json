@@ -1,0 +1,45 @@
+[
+  {
+    "name": "list_doctors",
+    "description": "List the clinic's doctors with their id, name and specialty.",
+    "input_schema": { "type": "object", "properties": {}, "required": [] },
+    "request": { "method": "GET", "path": "api/doctors" },
+    "response": { "select": "doctors" },
+    "test": { "input": {} }
+  },
+  {
+    "name": "list_open_slots",
+    "description": "List open appointment slots for one doctor on one day.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "doctor_id": { "type": "string", "description": "Doctor id from list_doctors" },
+        "date": { "type": "string", "description": "Day as YYYY-MM-DD" }
+      },
+      "required": ["doctor_id", "date"]
+    },
+    "request": { "method": "GET", "path": "api/slots", "query": { "doctor": "{{doctor_id}}", "date": "{{date}}" } },
+    "response": { "select": "slots" },
+    "test": { "input": { "doctor_id": "{{from:list_doctors:0.id}}", "date": "2026-12-01" } }
+  },
+  {
+    "name": "book_appointment",
+    "description": "Book an open slot for a patient. Returns the appointment reference.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "slot_id": { "type": "string", "description": "Slot id from list_open_slots" },
+        "patient_name": { "type": "string" },
+        "phone": { "type": "string" }
+      },
+      "required": ["slot_id", "patient_name", "phone"]
+    },
+    "request": {
+      "method": "POST",
+      "path": "api/appointments",
+      "body": { "slot_id": "{{slot_id}}", "patient_name": "{{patient_name}}", "phone": "{{phone}}" }
+    },
+    "response": { "select": "appointment" },
+    "test": { "input": { "slot_id": "{{from:list_open_slots:0.id}}", "patient_name": "Doorway Verifier", "phone": "000-0000" } }
+  }
+]

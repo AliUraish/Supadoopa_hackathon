@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pawsome Vet · Book an appointment</title>
+<style>
+  :root {
+    --brand: #e8590c; --brand-dark: #c2410c; --sky: #eef5ff; --ink: #1c2541; --muted: #5c6784;
+    --line: #dbe4f3; --mint: #0f8a68; --sun: #ffd166;
+  }
+  * { box-sizing: border-box }
+  body {
+    margin: 0; color: var(--ink); background: var(--sky);
+    font: 16px/1.55 ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
+  }
+  header { background: #fff; border-bottom: 1px solid var(--line) }
+  .bar { max-width: 760px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 12px }
+  .logo {
+    width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+    background: var(--brand); color: #fff; transform: rotate(-8deg);
+  }
+  .brand { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em }
+  .brand small { display: block; font-size: 13px; font-weight: 600; color: var(--muted) }
+  .hero { max-width: 760px; margin: 28px auto 8px; padding: 0 16px }
+  .hero h1 { margin: 0 0 6px; font-size: 32px; line-height: 1.15; letter-spacing: -.02em }
+  .hero h1 em { font-style: normal; color: var(--brand); background: linear-gradient(transparent 62%, var(--sun) 0) }
+  .hero p { margin: 0; color: var(--muted) }
+  main { max-width: 760px; margin: 20px auto 40px; padding: 0 16px }
+  .card {
+    background: #fff; border-radius: 22px; padding: 24px; margin-bottom: 18px;
+    box-shadow: 0 1px 0 var(--line), 0 18px 40px -30px rgba(28, 37, 65, .45);
+  }
+  h2 { margin: 0; font-size: 19px; display: flex; align-items: center; gap: 10px }
+  h2 .step {
+    width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--sun); font-size: 15px;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
+  label { display: block; margin: 14px 0 6px; font-weight: 700; font-size: 14px }
+  select, input {
+    width: 100%; padding: 11px 14px; border: 2px solid var(--line); border-radius: 14px;
+    font: inherit; color: var(--ink); background: #fff;
+  }
+  select:focus, input:focus { border-color: var(--brand); outline: none }
+  button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px }
+  button {
+    margin-top: 18px; padding: 12px 22px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--brand); color: #fff; font: inherit; font-weight: 800;
+    box-shadow: 0 4px 0 var(--brand-dark);
+  }
+  button:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--brand-dark) }
+  .slots { display: flex; flex-wrap: wrap; gap: 8px }
+  .slots button {
+    margin: 0; padding: 8px 14px; background: var(--sky); color: var(--ink); font-weight: 700;
+    box-shadow: none; border: 2px solid var(--line);
+  }
+  .slots button[aria-pressed=true] { background: var(--ink); border-color: var(--ink); color: #fff }
+  .muted { color: var(--muted) } .hidden { display: none }
+  #result { margin: 16px 0 0; font-weight: 700 }
+  .ok { color: var(--mint) } .err { color: #c0262d }
+  footer { text-align: center; color: var(--muted); font-size: 14px; padding: 0 16px 32px }
+  @media (max-width: 560px) { .row { grid-template-columns: 1fr } .hero h1 { font-size: 26px } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26"><g fill="currentColor">
+        <ellipse cx="8" cy="13" rx="3" ry="4"/><ellipse cx="13.5" cy="7.5" rx="3" ry="4"/>
+        <ellipse cx="19.5" cy="7.5" rx="3" ry="4"/><ellipse cx="25" cy="13" rx="3" ry="4"/>
+        <path d="M16.5 14c-5 0-9 6-9 9.5 0 3 3 3.4 5 2.5s2.6-1 4-1 2 .2 4 1 5 .5 5-2.5c0-3.5-4-9.5-9-9.5z"/>
+      </g></svg>
+    </div>
+    <p class="brand">Pawsome Vet<small>Neighbourhood animal hospital</small></p>
+  </div>
+</header>
+<section class="hero">
+  <h1>Happy pets, <em>happy people.</em></h1>
+  <p>Same-week appointments for dogs, cats and the more unusual members of the family.</p>
+</section>
+<main>
+  <section class="card" aria-labelledby="step1">
+    <h2 id="step1"><span class="step">1</span>Choose a vet and a day</h2>
+    <form id="search-form" novalidate>
+      <div class="row">
+        <div><label for="vet">Vet</label><select id="vet" name="vet"></select></div>
+        <div><label for="date">Day</label><input id="date" name="date" type="date"></div>
+      </div>
+      <button id="find" type="submit">Show open times</button>
+    </form>
+    <p id="slots-msg" class="muted" aria-live="polite"></p>
+    <div id="slots" class="slots" role="group" aria-label="Open appointment times"></div>
+  </section>
+  <section class="card hidden" id="details" aria-labelledby="step2">
+    <h2 id="step2"><span class="step">2</span>About you and your pet</h2>
+    <form id="book-form" novalidate>
+      <label for="pet">Pet's name</label>
+      <input id="pet" name="pet" autocomplete="off">
+      <div class="row">
+        <div><label for="name">Your name</label><input id="name" name="name" autocomplete="name"></div>
+        <div><label for="phone">Phone</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel"></div>
+      </div>
+      <button id="book" type="submit">Book appointment</button>
+    </form>
+    <p id="result" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<footer>48 Meadow Lane · Mon–Sat 8:30–16:30 · Emergencies: call us any time</footer>
+<script>
+/*CLIENT*/
+let chosen = null;
+$('date').value = tomorrow();
+client.vets().then((vets) => {
+  $('vet').innerHTML = vets.map((v) =>
+    `<option value="${esc(v.id)}">${esc(v.name)} · ${esc(v.specialty)}</option>`).join('');
+});
+$('search-form').onsubmit = async (e) => {
+  e.preventDefault();
+  chosen = null;
+  $('details').classList.add('hidden');
+  $('slots').innerHTML = '';
+  try {
+    const slots = await client.slots($('vet').value, $('date').value);
+    $('slots-msg').textContent = slots.length ? 'Pick a time:' : 'Fully booked that day, try another.';
+    $('slots').innerHTML = slots.map((s) =>
+      `<button type="button" data-id="${esc(s.id)}" aria-pressed="false">${esc(s.time)}</button>`,
+    ).join('');
+  } catch (err) {
+    $('slots-msg').textContent = 'Could not load times: ' + err.message;
+  }
+};
+$('slots').onclick = (e) => {
+  const picked = e.target.closest('button');
+  if (!picked) return;
+  $('slots').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === picked)));
+  chosen = picked.dataset.id;
+  $('result').textContent = '';
+  $('details').classList.remove('hidden');
+  $('pet').focus();
+};
+$('book-form').onsubmit = async (e) => {
+  e.preventDefault();
+  if (!chosen) return;
+  const r = await client.book(chosen, $('pet').value, $('name').value, $('phone').value);
+  $('result').className = r.error ? 'err' : 'ok';
+  if (r.error) { $('result').textContent = failure('book', r.error); return; }
+  $('result').textContent = `Booked! ${r.pet} with ${r.vet}, ${r.when}. Reference ${r.id}.`;
+  $('slots').querySelector('[aria-pressed=true]')?.remove();
+  chosen = null;
+};
+</script>
+</body>
+</html>
