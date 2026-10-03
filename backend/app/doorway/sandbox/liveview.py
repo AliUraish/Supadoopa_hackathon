@@ -2,7 +2,7 @@
 """Live view: watch every sandbox's browser while it explores, verifies, heals or races.
 
 The sandbox process serves it on $PORT (Supabase Compute's public URL):
-  GET /             grid of sandboxes, frames refresh about once a second
+  GET /             grid of sandboxes, frames refresh every LIVE_REFRESH_MS (2 s)
   GET /frame/{id}   latest JPEG of that sandbox's active page
   GET /state        JSON: per sandbox job, site, page URL, frame age
 Contexts are tagged with the sandbox that opened them (the worker sets current_sandbox).
@@ -20,12 +20,13 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from .. import browser
+from ..interfaces import LIVE_REFRESH_MS
 
 current_sandbox: ContextVar[str | None] = ContextVar("current_sandbox", default=None)
 JOBS: dict[str, dict] = {}  # sandbox id -> {"kind", "job_id", "site_id"} while busy
 FRAMES: dict[str, dict] = {}  # sandbox id -> {"jpeg", "url", "at"}
 _live: dict[object, str] = {}  # open BrowserContext -> sandbox id
-FRAME_INTERVAL_S = 0.8
+FRAME_INTERVAL_S = LIVE_REFRESH_MS / 1000  # clients poll /state at the same pace
 PIPELINE = ["Request", "Discover", "Observe", "Compile", "Verify", "Publish", "Optimize",
             "Execute", "Pay", "Heal"]  # fmt: skip
 STAGES = {  # job kind -> pipeline stages it is working through
@@ -112,6 +113,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'
 async function tick() {
   try {
     const st = await (await fetch('state', {cache: 'no-store'})).json();
+    every = st.refresh_ms || every;
     $('sub').textContent = st.sandboxes.length + ' sandboxes · ' + st.active.length + ' stages active';
     $('pipe').innerHTML = st.pipeline.map((p) =>
       `<span class="stage ${st.active.includes(p) ? 'on' : ''}">${p}</span>`).join('→');
@@ -127,7 +129,9 @@ async function tick() {
       + `${esc((e.created_at || '').slice(11, 19))}</small></div>`).join('');
   } catch (e) { $('sub').textContent = 'reconnecting…'; }
 }
-tick(); setInterval(tick, 1000);
+let every = 2000;
+async function loop() { await tick(); setTimeout(loop, every); }
+loop();
 </script></body></html>"""
 
 
@@ -147,7 +151,13 @@ def app(ids: list[str], store=None) -> Starlette:
                     for e in await store.list_events(limit=25)
                 ]
         active = sorted({st for job in JOBS.values() for st in STAGES.get(job["kind"], [])})
-        body = {"pipeline": PIPELINE, "active": active, "sandboxes": _state(ids), "events": events}
+        body = {
+            "pipeline": PIPELINE,
+            "active": active,
+            "sandboxes": _state(ids),
+            "events": events,
+            "refresh_ms": LIVE_REFRESH_MS,
+        }
         # Read-only, public: the dashboard on any origin polls it.
         headers = {"Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"}
         return JSONResponse(body, headers=headers)

@@ -14,6 +14,7 @@ import { useDashboardNav } from "@/components/dashboard/dashboard-tabs";
 import { Button, Empty, ErrorBanner, Panel, Skeleton } from "@/components/px/ui";
 import { AgentConsole } from "./agent-console";
 import { packetForEvent, packetForMessage, type PacketSpec } from "./flow";
+import { ConnectCard } from "./connect-card";
 import { ScenePanel } from "./scene-panel";
 import { useAgentChat } from "./use-agent-chat";
 
@@ -76,6 +77,7 @@ export function WorkspaceTab({ active }: { active: boolean }) {
         packets={packets}
         agentBusy={chat.busy}
       />
+      <ConnectCard active={active} />
       <div className="grid gap-4 lg:grid-cols-2">
         <AgentConsole
           chat={chat}

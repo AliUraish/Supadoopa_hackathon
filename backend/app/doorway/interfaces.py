@@ -53,6 +53,9 @@ from typing import Any, Literal, Protocol
 Strategy = Literal["api", "form", "browser"]
 STRATEGIES: tuple[Strategy, ...] = ("api", "form", "browser")
 
+# How often clients refresh the sandboxes' live view (state + frames). Backend-owned.
+LIVE_REFRESH_MS = 2000
+
 JOB_PRIORITY = {"heal": 100, "race": 80, "verify": 50, "optimize": 20, "discover": 10}
 
 EVENT_KINDS = (

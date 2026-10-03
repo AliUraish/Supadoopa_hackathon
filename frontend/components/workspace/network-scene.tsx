@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Grid, Html, QuadraticBezierLine, RoundedBox } from "@react-three/drei";
+import { Billboard, Grid, QuadraticBezierLine, RoundedBox, Text } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import type { SandboxStatus } from "@/lib/doorway";
 import type { Tone } from "@/lib/doorway/format";
@@ -159,23 +159,44 @@ function pulseLevel(storeRef: RefObject<Store>, key: string, t: number): number 
 
 // ── Pieces ──────────────────────────────────────────────────────────────────
 
+// Labels are drawn in WebGL (troika text), not DOM overlays: drei's <Html> mounts a React root
+// per label, which logs "unmount while rendering" errors as live data re-renders the scene.
 function Label({
   position,
-  children,
-  center = true,
-  interactive = false,
+  title,
+  sub,
+  subColor = "#6b6b6b",
+  titleColor = "#ededed",
+  size = 0.26,
+  onClick,
 }: {
   position: V3;
-  children: ReactNode;
-  center?: boolean;
-  interactive?: boolean;
+  title: string;
+  sub?: string;
+  subColor?: string;
+  titleColor?: string;
+  size?: number;
+  onClick?: () => void;
 }) {
   return (
-    <Html position={position} center={center} zIndexRange={[5, 0]} style={{ pointerEvents: interactive ? "auto" : "none" }}>
-      <div className={center ? "whitespace-nowrap text-center leading-tight" : "-translate-y-1/2 whitespace-nowrap leading-tight"}>
-        {children}
-      </div>
-    </Html>
+    <Billboard position={position}>
+      <Text
+        fontSize={size}
+        color={titleColor}
+        anchorX="center"
+        anchorY="bottom"
+        onClick={onClick}
+        onPointerOver={onClick ? () => (document.body.style.cursor = "pointer") : undefined}
+        onPointerOut={onClick ? () => (document.body.style.cursor = "") : undefined}
+      >
+        {title}
+      </Text>
+      {sub && (
+        <Text position={[0, -0.05, 0]} fontSize={size * 0.72} color={subColor} anchorX="center" anchorY="top">
+          {sub}
+        </Text>
+      )}
+    </Billboard>
   );
 }
 
@@ -236,10 +257,7 @@ function AgentNode({ storeRef, busy }: { storeRef: RefObject<Store>; busy: boole
           <meshStandardMaterial color={BODY_2} roughness={0.8} />
         </mesh>
       </Pulse>
-      <Label position={[0, 1.45, 0]}>
-        <span className="block text-[12px] font-medium text-text">Your agent</span>
-        <span className="block font-mono text-[10px] text-faint">MCP client</span>
-      </Label>
+      <Label position={[0, 1.45, 0]} title="Your agent" sub="MCP client" />
     </group>
   );
 }
@@ -298,10 +316,7 @@ function GatewayNode({
           <meshBasicMaterial color={DOOR_GLOW} toneMapped={false} />
         </mesh>
       </Pulse>
-      <Label position={[0, 2.15, 0]}>
-        <span className="block text-[12px] font-medium text-text">Doorway</span>
-        <span className="block font-mono text-[10px] text-faint">gateway · MCP + HTTP 402</span>
-      </Label>
+      <Label position={[0, 2.15, 0]} title="Doorway" sub="gateway · MCP + HTTP 402" />
     </group>
   );
 }
@@ -380,24 +395,14 @@ function SandboxNode({
           </group>
         )}
       </Pulse>
-      <Label position={[0, 1.3, 0]} interactive={Boolean(sandbox.siteId)}>
-        <span className="block font-mono text-[11px] text-text">{sandbox.id}</span>
-        <span
-          className="flex items-center justify-center gap-1 font-mono text-[10px]"
-          style={{ color: offline ? TONE_HEX.bad : busy ? TONE_HEX.ok : "var(--color-faint)" }}
-        >
-          {offline ? "offline" : busy ? (sandbox.jobKind ?? "busy") : "idle"}
-          {sandbox.siteId && (
-            <button
-              type="button"
-              onClick={() => onNavigate("sites", sandbox.siteId ?? undefined)}
-              className="rounded border border-line bg-panel/80 px-1 text-muted hover:border-line-2 hover:text-text"
-            >
-              {sandbox.siteId}
-            </button>
-          )}
-        </span>
-      </Label>
+      <Label
+        position={[0, 1.3, 0]}
+        title={sandbox.id}
+        sub={`${offline ? "offline" : busy ? (sandbox.jobKind ?? "busy") : "idle"}${sandbox.siteId ? ` · ${sandbox.siteId}` : ""}`}
+        subColor={offline ? TONE_HEX.bad : busy ? TONE_HEX.ok : "#6b6b6b"}
+        size={0.22}
+        onClick={sandbox.siteId ? () => onNavigate("sites", sandbox.siteId ?? undefined) : undefined}
+      />
     </group>
   );
 }
@@ -419,13 +424,9 @@ function Platform({ layout, logo, empty }: { layout: Layout; logo: THREE.Texture
           <meshBasicMaterial map={logo} transparent />
         </mesh>
       )}
-      <Label position={[-w / 2 + 0.85, 0.2, d / 2 - 0.45]} center={false}>
-        <span className="text-[11px] font-medium text-muted">Supabase Compute</span>
-      </Label>
+      <Label position={[-w / 2 + 2.15, 0.2, d / 2 - 0.45]} title="Supabase Compute" titleColor="#a1a1a1" size={0.2} />
       {empty && (
-        <Label position={[0, 0.45, -0.3]}>
-          <span className="text-[12px] text-faint">{empty}</span>
-        </Label>
+        <Label position={[0, 0.45, -0.3]} title={empty} titleColor="#6b6b6b" size={0.22} />
       )}
     </group>
   );
@@ -462,12 +463,7 @@ function PostgresNode({ storeRef, position, patterns, logo }: { storeRef: RefObj
           </mesh>
         )}
       </Pulse>
-      <Label position={[0, 1.75, 0]}>
-        <span className="block text-[12px] font-medium text-text">Postgres</span>
-        <span className="block font-mono text-[10px] text-faint">
-          {patterns} shared pattern{patterns === 1 ? "" : "s"}
-        </span>
-      </Label>
+      <Label position={[0, 1.75, 0]} title="Postgres" sub={`${patterns} shared pattern${patterns === 1 ? "" : "s"}`} />
     </group>
   );
 }

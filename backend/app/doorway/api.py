@@ -29,7 +29,7 @@ from ..billing.auth import User, current_user
 from ..billing.config import NotConfigured, get_settings
 from ..billing.mpp import _claim_reference, get_mpp
 from . import broker, demo
-from .interfaces import JOB_PRIORITY, DoorwayStore
+from .interfaces import JOB_PRIORITY, LIVE_REFRESH_MS, DoorwayStore
 from .mcp_server import MCPResponse, build_server
 from .store import StoreError, get_doorway_store
 
@@ -843,4 +843,8 @@ async def live_view() -> dict:
         if settings.supabase_url
         else None
     )
-    return {"url": base, "state_url": f"{base}state" if base else None}
+    return {
+        "url": base,
+        "state_url": f"{base}state" if base else None,
+        "refresh_ms": LIVE_REFRESH_MS,  # poll state/frames this often; not shown in the UI
+    }

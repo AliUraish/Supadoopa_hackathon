@@ -733,8 +733,21 @@ async def test_mcp_lists_and_calls_tools(clinic, site, store, configure, mode):
     configure(API_URL="https://api.doorway.test")
     async with mcp_client("/doorway/mcp", mode) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
-        assert set(tools) == {f"{SITE}__list_open_slots", f"{SITE}__book_appointment"}
+        meta = {"doorway_create_tools", "doorway_get_tools", "doorway_call_tool"}
+        assert set(tools) == {f"{SITE}__list_open_slots", f"{SITE}__book_appointment"} | meta
         book = tools[f"{SITE}__book_appointment"]
+
+        # An agent asks for tools for a known site and gets them back, then calls one by name.
+        made = await client.call_tool("doorway_create_tools", {"website": SITE, "goal": "x"})
+        assert json.loads(made.content[0].text)["site_id"] == SITE
+        got = await client.call_tool("doorway_get_tools", {"site_id": SITE, "wait_seconds": 0})
+        names = [t["name"] for t in json.loads(got.content[0].text)["tools"]]
+        assert f"{SITE}__list_open_slots" in names
+        ran = await client.call_tool(
+            "doorway_call_tool", {"tool": f"{SITE}__list_open_slots", "arguments": {}}
+        )
+        assert not ran.is_error and json.loads(ran.content[0].text)[0]["id"] == 7
+        site.calls.clear()
         assert book.input_schema["required"] == ["slot_id"] and "$0.50" in book.description
 
         result = await client.call_tool(f"{SITE}__list_open_slots", {"day": "2026-10-04"})
@@ -752,7 +765,7 @@ async def test_mcp_lists_and_calls_tools(clinic, site, store, configure, mode):
         assert missing.is_error
         unknown = await client.call_tool("nope__tool", {})
         assert unknown.is_error
-    assert len(events(store, "execute.call")) == 2
+    assert len(events(store, "execute.call")) == 3  # incl. the doorway_call_tool run
 
 
 @pytest.mark.anyio
