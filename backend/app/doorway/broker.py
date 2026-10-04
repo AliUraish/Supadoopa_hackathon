@@ -24,7 +24,7 @@ from urllib.parse import urlsplit
 
 from ..billing.auth import User
 from ..billing.config import get_settings
-from . import executor
+from . import executor, sessions
 from .interfaces import JOB_PRIORITY, DoorwayStore, ExecResult
 
 log = logging.getLogger(__name__)
@@ -121,6 +121,31 @@ async def run_tool(
     remember: bool = False,
     mode: str = "broker",
     paid_reference: str | None = None,
+    owner: bool = False,
+) -> Outcome:
+    """Run a published tool. A signed-in user's saved sign-in for the site (or, for the owner's
+    own Claude, the site's latest) rides along via sessions.CURRENT, never in the spec."""
+    saved = None
+    if user is not None or owner:
+        saved = await sessions.load(tool["site_id"], user.id if user else None)
+    token = sessions.CURRENT.set(saved)
+    try:
+        return await _run_tool(
+            store, tool, arguments, user, use_profile, remember, mode, paid_reference
+        )
+    finally:
+        sessions.CURRENT.reset(token)
+
+
+async def _run_tool(
+    store: DoorwayStore,
+    tool: dict,
+    arguments: dict | None,
+    user: User | None,
+    use_profile: bool,
+    remember: bool,
+    mode: str,
+    paid_reference: str | None,
 ) -> Outcome:
     submitted = dict(arguments or {})
     args = dict(submitted)

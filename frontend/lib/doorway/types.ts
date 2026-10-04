@@ -56,6 +56,8 @@ export const EVENT_KINDS = [
   "heal.fail",
   "sandbox.online",
   "sandbox.offline",
+  "human.needed",
+  "human.done",
 ] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
@@ -288,6 +290,12 @@ export interface Consent {
   granted_at: string;
 }
 
+// A site the user signed in to through a sandbox (the session is stored encrypted, never shown).
+export interface SavedSession {
+  site_id: string;
+  saved_at: string;
+}
+
 export interface RunToolBody {
   arguments: Record<string, unknown>;
   use_profile?: boolean;
@@ -340,6 +348,7 @@ export interface AgentRequest {
 export interface LiveView {
   url: string; // self-contained page (pipeline strip, ~1 fps screens, event feed)
   state_url: string; // JSON state behind it, for a custom UI
+  refresh_ms?: number; // how often to poll state and frames (owned by the backend)
 }
 
 // ── Realtime ──────────────────────────────────────────────────────────────
@@ -406,6 +415,8 @@ export interface DoorwayApi {
   consents(): Promise<Consent[]>;
   grantConsent(siteId: string, fields: string[]): Promise<Consent>;
   revokeConsent(id: number): Promise<void>;
+  sessions(): Promise<SavedSession[]>;
+  deleteSession(siteId: string): Promise<void>;
   // agent-facing broker
   request(body: { website: string; task: string; inputs?: Record<string, unknown> }): Promise<AgentRequestCreated>;
   getRequest(id: string): Promise<AgentRequest>;

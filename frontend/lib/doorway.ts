@@ -29,6 +29,7 @@ import type {
   RunToolBody,
   RunToolResult,
   Sandbox,
+  SavedSession,
   Site,
   SiteDetail,
   Tool,
@@ -85,6 +86,12 @@ async function accessToken(): Promise<string | null> {
     });
   });
   return anonSignIn;
+}
+
+/** Authorization header for direct calls to Doorway services (e.g. a sandbox's live view). */
+export async function authHeader(): Promise<Record<string, string>> {
+  const token = await accessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function anonymousAllowed(): Promise<boolean> {
@@ -184,6 +191,8 @@ export const httpApi: DoorwayApi = {
   grantConsent: (siteId, fields) =>
     http<Consent>("/doorway/consents", { method: "POST", body: { site_id: siteId, fields }, auth: true }),
   revokeConsent: (id) => http<void>(`/doorway/consents/${id}`, { method: "DELETE", auth: true }),
+  sessions: () => http<SavedSession[]>("/doorway/sessions", { auth: true }),
+  deleteSession: (siteId) => http<void>(`/doorway/sessions/${enc(siteId)}`, { method: "DELETE", auth: true }),
 
   request: (body) => http<AgentRequestCreated>("/doorway/requests", { method: "POST", body }),
   getRequest: (id) => http<AgentRequest>(`/doorway/requests/${enc(id)}`),

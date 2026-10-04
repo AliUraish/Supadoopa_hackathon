@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
-from .. import executor, explorer
+from .. import executor, explorer, sessions
 from .. import patterns as pat
 from ..interfaces import JOB_PRIORITY, STRATEGIES, DoorwayStore, ExecResult, VerifyResult
 from ..spec import available, depends_on, normalize, resolve_test_inputs
@@ -60,6 +60,9 @@ async def run(job: dict, ctx: JobContext) -> dict:
     handler = HANDLERS.get(job["kind"])
     if handler is None:
         raise JobFailed(f"unknown job kind {job['kind']!r}")
+    # A site someone signed in to: this job's browser contexts and api calls start signed in.
+    if job.get("site_id"):
+        sessions.CURRENT.set(await sessions.load(job["site_id"]))
     return await handler(job, ctx)
 
 

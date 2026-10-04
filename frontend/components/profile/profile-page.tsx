@@ -9,6 +9,7 @@ import { doorway, DoorwayError, type Tool } from "@/lib/doorway";
 import { useLive } from "@/lib/doorway/live";
 import { Icon, type IconName } from "@/components/px/icons";
 import { Banner, Button, ButtonLink, Empty, ErrorBanner, Loading, Panel, Skeleton } from "@/components/px/ui";
+import { ConnectedSites } from "./connected-sites";
 import { ConsentMatrix } from "./consent-matrix";
 import { DetailsEditor } from "./details-editor";
 import { allFields, consentFields, profileStrings, toolFields } from "./fields";
@@ -170,6 +171,8 @@ export function ProfilePage({ guest }: { guest: boolean }) {
           </HowItem>
         </div>
       </Panel>
+
+      <ConnectedSites />
     </div>
   );
 }

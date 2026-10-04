@@ -14,6 +14,8 @@ from typing import Any
 
 from playwright.async_api import Browser, BrowserContext, async_playwright
 
+from . import sessions
+
 LAUNCH_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
 # Called with every new context (the sandbox live view tags them with their sandbox).
 CONTEXT_HOOKS: list = []
@@ -53,6 +55,9 @@ async def get_browser() -> Browser:
 
 async def new_context(**options: Any) -> BrowserContext:
     """A fresh isolated context (no cookies/storage shared with other runs). Close it after."""
+    saved = sessions.CURRENT.get()  # a saved sign-in for this run: start signed in
+    if saved and "storage_state" not in options:
+        options["storage_state"] = saved
     context = await (await get_browser()).new_context(**options)
     for hook in CONTEXT_HOOKS:
         with contextlib.suppress(Exception):

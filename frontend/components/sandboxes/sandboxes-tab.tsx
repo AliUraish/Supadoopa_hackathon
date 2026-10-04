@@ -10,8 +10,10 @@ import { clockTime, eventStyle, timeAgo, TONE_COLOR } from "@/lib/doorway/format
 import { useFeed, useLive, useNow } from "@/lib/doorway/live";
 import { SupabaseLogo } from "@/components/brand/supabase-logo";
 import { Icon } from "@/components/px/icons";
-import { Badge, Banner, Empty, ErrorBanner, Panel, Skeleton, StatusDot } from "@/components/px/ui";
+import { Badge, Banner, Button, Empty, ErrorBanner, Panel, Skeleton, StatusDot } from "@/components/px/ui";
+import { useComputeState, type ComputeSandbox } from "./compute";
 import { byNaturalId, jobKindStyle } from "./shared";
+import { TakeoverDialog } from "./takeover";
 
 export function SandboxesTab({ active }: { active: boolean }) {
   const sandboxes = useLive(active ? "sandboxes" : null, () => doorway.sandboxes(), {
@@ -23,6 +25,11 @@ export function SandboxesTab({ active }: { active: boolean }) {
     limit: 40,
   });
   const frameBase = live.data?.url;
+  const refreshMs = live.data?.refresh_ms ?? 2000;
+  const compute = useComputeState(active ? live.data?.state_url : undefined, refreshMs);
+  const [signingIn, setSigningIn] = useState<string | null>(null);
+  const waiting = (compute?.sandboxes ?? []).filter((c) => c.needs_human);
+  const takeoverSandbox = compute?.sandboxes.find((c) => c.sandbox === signingIn);
 
   const list = [...(sandboxes.data ?? [])].sort((a, b) => byNaturalId(a.id, b.id));
   const busy = list.filter((s) => s.status === "busy").length;
@@ -43,8 +50,29 @@ export function SandboxesTab({ active }: { active: boolean }) {
             <span className="text-text">{busy}</span> working
           </span>
         </header>
-        <Pipeline events={events.items} />
+        <Pipeline events={events.items} active={compute?.active} />
       </section>
+
+      {waiting.map((c) => (
+        <Banner
+          key={c.sandbox}
+          tone="warn"
+          icon="lock"
+          title={`${c.needs_human?.site_id ?? c.sandbox} needs you to sign in`}
+          action={
+            <Button size="sm" icon="lock" onClick={() => setSigningIn(c.sandbox)}>
+              Sign in
+            </Button>
+          }
+        >
+          {c.sandbox} stopped at {c.needs_human?.reason ?? "a login wall"}. Sign in through its browser and it carries on
+          building tools.
+        </Banner>
+      ))}
+
+      {signingIn && frameBase && takeoverSandbox && (
+        <TakeoverDialog liveUrl={frameBase} sandbox={takeoverSandbox} onClose={() => setSigningIn(null)} />
+      )}
 
       {!sandboxes.loading && !online && (
         <Banner tone="warn" icon="sandbox" title="No sandbox is running right now">
@@ -77,6 +105,9 @@ export function SandboxesTab({ active }: { active: boolean }) {
                 sandbox={s}
                 frameBase={frameBase}
                 active={active}
+                refreshMs={refreshMs}
+                compute={compute?.sandboxes.find((c) => c.sandbox === s.id)}
+                onSignIn={() => setSigningIn(s.id)}
                 lastAction={events.items.find((e) => e.sandbox_id === s.id)}
               />
             ))}
@@ -103,9 +134,9 @@ const STAGES: { id: string; label: string; kinds: (EventKind | string)[] }[] = [
 ];
 const ACTIVE_FOR_MS = 15_000;
 
-function Pipeline({ events }: { events: DoorwayEvent[] }) {
+function Pipeline({ events, active }: { events: DoorwayEvent[]; active?: string[] }) {
   const now = useNow();
-  const lit = new Set<string>();
+  const lit = new Set<string>((active ?? []).map((a) => a.toLowerCase()));
   for (const e of events) {
     if (now && now - new Date(e.created_at).getTime() > ACTIVE_FOR_MS) break;
     const stage = STAGES.find((s) => s.kinds.includes(e.kind));
@@ -138,25 +169,62 @@ function SandboxCard({
   sandbox: s,
   frameBase,
   active,
+  refreshMs,
+  compute,
+  onSignIn,
   lastAction,
 }: {
   sandbox: Sandbox;
   frameBase?: string;
   active: boolean;
+  refreshMs: number;
+  compute?: ComputeSandbox;
+  onSignIn: () => void;
   lastAction?: DoorwayEvent;
 }) {
   const now = useNow();
+  const needsSignIn = Boolean(compute?.needs_human);
   const working = s.status === "busy";
   const kind = jobKindStyle(s.job_kind);
   return (
-    <section className="px-panel flex flex-col overflow-hidden" style={working ? { borderColor: "color-mix(in srgb, var(--color-green) 35%, transparent)" } : undefined}>
+    <section
+      className="px-panel flex flex-col overflow-hidden"
+      style={
+        needsSignIn
+          ? { borderColor: "color-mix(in srgb, var(--color-amber) 55%, transparent)" }
+          : working
+            ? { borderColor: "color-mix(in srgb, var(--color-green) 35%, transparent)" }
+            : undefined
+      }
+    >
       <header className="flex items-center gap-2.5 border-b border-line px-4 py-3">
         <StatusDot status={s.status} />
         <span className="font-mono text-[13px] text-text">{s.id}</span>
         <Badge status={s.status} />
         <span className="ml-auto text-xs text-faint">heartbeat {timeAgo(s.last_heartbeat, now)}</span>
       </header>
-      <Screen sandbox={s} frameBase={frameBase} active={active} />
+      {compute?.url && (
+        <p className="truncate border-b border-line bg-bg-2 px-4 py-1.5 font-mono text-[11px] text-muted" title={compute.url}>
+          {compute.url}
+        </p>
+      )}
+      <Screen
+        key={compute?.job?.job_id ?? s.current_job_id ?? "idle"}
+        sandbox={s}
+        frameBase={frameBase}
+        active={active}
+        refreshMs={refreshMs}
+        live={compute?.live}
+      />
+      {needsSignIn && (
+        <div className="flex items-center gap-2 border-t border-amber/30 bg-amber/10 px-4 py-2.5 text-[13px] text-amber">
+          <Icon name="lock" size={14} />
+          <span className="min-w-0 flex-1 truncate">Needs your sign-in: {compute?.needs_human?.reason ?? "login wall"}</span>
+          <Button size="sm" onClick={onSignIn}>
+            Sign in
+          </Button>
+        </div>
+      )}
       <footer className="flex items-center gap-2 px-4 py-3 text-[13px]">
         {working && s.job_kind ? (
           <>
@@ -170,6 +238,21 @@ function SandboxCard({
         )}
         <span className="ml-auto text-xs text-faint">{s.jobs_done} jobs done</span>
       </footer>
+      <div className="flex items-center gap-2 border-t border-line px-4 py-2.5">
+        <Button
+          size="sm"
+          variant={needsSignIn ? "primary" : "ghost"}
+          icon="agent"
+          onClick={onSignIn}
+          disabled={!(working || compute?.live || needsSignIn)}
+          title={working || compute?.live ? "Control this sandbox's browser and enter your details" : "Available while the sandbox runs a job"}
+        >
+          Take over
+        </Button>
+        <span className="text-xs text-faint">
+          {working || compute?.live ? "Click, type and sign in on its screen" : "Available while it runs a job"}
+        </span>
+      </div>
       {lastAction && (
         <p className="truncate border-t border-line px-4 py-2 text-xs text-muted" title={lastAction.message}>
           <span className="font-mono text-faint">{clockTime(lastAction.created_at)}</span> · {firstLine(lastAction.message)}
@@ -179,20 +262,33 @@ function SandboxCard({
   );
 }
 
-/** The sandbox's live browser (≈1 fps) while it works; a quiet placeholder otherwise. */
-function Screen({ sandbox: s, frameBase, active }: { sandbox: Sandbox; frameBase?: string; active: boolean }) {
-  const busy = s.status === "busy";
+/** The sandbox's live browser while it works (refreshed every refresh_ms); a placeholder otherwise. */
+function Screen({
+  sandbox: s,
+  frameBase,
+  active,
+  refreshMs,
+  live,
+}: {
+  sandbox: Sandbox;
+  frameBase?: string;
+  active: boolean;
+  refreshMs: number;
+  live?: boolean;
+}) {
+  const busy = Boolean(live) || s.status === "busy";
   const [tick, setTick] = useState(0);
   const [fails, setFails] = useState(0);
-  // Three misses in a row: the live view is down (e.g. the Compute service is gone). Stop asking.
-  const unavailable = busy && (!frameBase || fails >= 3);
-  const streaming = busy && active && !unavailable;
+  // Keep retrying while the job runs (the browser can take a few seconds to start); after a few
+  // misses show a note instead of the screen. The card remounts this per job, so counts reset.
+  const unavailable = busy && (!frameBase || fails >= 5);
+  const streaming = busy && active && Boolean(frameBase);
 
   useEffect(() => {
     if (!streaming) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const id = setInterval(() => setTick((t) => t + 1), refreshMs);
     return () => clearInterval(id);
-  }, [streaming]);
+  }, [streaming, refreshMs]);
 
   return (
     <div className="relative aspect-[16/10] w-full bg-bg-2">

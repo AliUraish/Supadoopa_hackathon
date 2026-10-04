@@ -76,6 +76,12 @@ class NeedHuman(Exception):
     """A login wall, CAPTCHA or 2FA prompt: a person has to step in before exploring."""
 
 
+# Set by the sandbox (interactive sign-in): `await HUMAN(page, reason)` pauses on the wall with
+# the browser open until a person signs in from the dashboard, then returns so exploring goes
+# on signed in; it raises NeedHuman if they cancel or nobody comes. None: fail right away.
+HUMAN: Callable[[Any, str], Any] | None = None
+
+
 async def _emit(on_event: OnEvent | None, kind: str, message: str, data: dict | None = None):
     if on_event is None:
         return
@@ -1205,7 +1211,9 @@ async def check_human_wall(page: Any) -> None:
         }"""  # noqa: E501
     )
     if wall:
-        raise NeedHuman(f"the site shows {wall}; a person has to sign in first")
+        if HUMAN is None:
+            raise NeedHuman(f"the site shows {wall}; a person has to sign in first")
+        await HUMAN(page, wall)
 
 
 class HeuristicExplorer:
@@ -1446,7 +1454,15 @@ class ClaudeExplorer:
                 results, accepted = [], None
                 for call in calls:
                     if call.name == "need_human":
-                        raise NeedHuman(str((call.input or {}).get("reason") or "needs a person"))
+                        reason = str((call.input or {}).get("reason") or "needs a person")
+                        if HUMAN is None:
+                            raise NeedHuman(reason)
+                        await HUMAN(page, reason)
+                        content = f"A person signed in; the browser is now at {page.url}. Go on."
+                        results.append(
+                            {"type": "tool_result", "tool_use_id": call.id, "content": content}
+                        )
+                        continue
                     content, is_error, ok = await self._tool(rec, call.name, call.input or {})
                     accepted = ok or accepted
                     results.append(

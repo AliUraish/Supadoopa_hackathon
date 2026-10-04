@@ -150,6 +150,7 @@ const FAMILY: Record<string, Omit<EventStyle, "label">> = {
   tool: { stage: "heal", icon: "broken", tone: "bad" },
   heal: { stage: "heal", icon: "heal", tone: "warn" },
   sandbox: { stage: null, icon: "sandbox", tone: "muted" },
+  human: { stage: "discover", icon: "lock", tone: "warn" },
 };
 
 /** Icon, colour and pipeline stage for an event kind like "verify.pass". */
@@ -158,7 +159,7 @@ export function eventStyle(kind: EventKind | string): EventStyle {
   const base = FAMILY[family] ?? { stage: null, icon: "dot" as IconName, tone: "muted" as Tone };
   let tone = base.tone;
   if (action === "fail" || action === "offline") tone = "bad";
-  if (kind === "heal.done") tone = "ok";
+  if (kind === "heal.done" || kind === "human.done") tone = "ok";
   if (kind === "lookup.miss") tone = "warn";
   if (kind === "sandbox.online") tone = "ok";
   return { ...base, tone, label: kind };

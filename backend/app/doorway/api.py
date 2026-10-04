@@ -28,7 +28,7 @@ from ..billing import agents
 from ..billing.auth import User, current_user
 from ..billing.config import NotConfigured, get_settings
 from ..billing.mpp import _claim_reference, get_mpp
-from . import broker, demo
+from . import broker, demo, sessions
 from .interfaces import JOB_PRIORITY, LIVE_REFRESH_MS, DoorwayStore
 from .mcp_server import MCPResponse, build_server
 from .store import StoreError, get_doorway_store
@@ -649,6 +649,18 @@ async def put_profile(body: ProfileIn, user: User = SignedIn, store: DoorwayStor
 @router.get("/consents")
 async def list_consents(user: User = SignedIn, store: DoorwayStore = Store) -> list[dict]:
     return await store.list_consents(user.id)
+
+
+@router.get("/sessions")
+async def list_sessions(user: User = SignedIn) -> list[dict]:
+    """Sites this user signed in to inside a sandbox (saved encrypted sessions, no passwords)."""
+    return await sessions.list_for(user.id)
+
+
+@router.delete("/sessions/{site_id}", status_code=204)
+async def delete_session(site_id: str, user: User = SignedIn) -> Response:
+    await sessions.delete(user.id, site_id)
+    return Response(status_code=204)
 
 
 @router.post("/consents")

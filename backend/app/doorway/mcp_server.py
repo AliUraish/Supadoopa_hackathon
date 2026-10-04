@@ -227,7 +227,7 @@ def build_server(store: DoorwayStore, site_id: str | None = None, *, pay=None) -
             except Exception as error:  # noqa: BLE001  (payment problems go back as text)
                 return _text(f"Payment failed: {error}", error=True)
             outcome = await broker.run_tool(
-                store, tool, args, mode="broker", paid_reference=payment["reference"]
+                store, tool, args, mode="broker", paid_reference=payment["reference"], owner=True
             )
             paid = (
                 f"(paid ${broker.price_usd(tool)} in Stripe test mode, ref {payment['reference']})"
@@ -250,7 +250,7 @@ def build_server(store: DoorwayStore, site_id: str | None = None, *, pay=None) -
                 },
             )
             return _text(json.dumps(link))
-        outcome = await broker.run_tool(store, tool, args, mode="broker")
+        outcome = await broker.run_tool(store, tool, args, mode="broker", owner=pay is not None)
         if not outcome.ok:
             return _text(f"Error: {outcome.error}", error=True)
         note = (

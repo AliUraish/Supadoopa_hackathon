@@ -13,6 +13,7 @@ import { TABS, type TabId } from "@/components/dashboard/tabs";
 import { Icon, type IconName } from "@/components/px/icons";
 import { LiveBadge } from "@/components/px/client";
 import { cx } from "@/components/px/ui";
+import { SignInAlert } from "@/components/shell/signin-alert";
 
 type Account = { email: string | null; guest: boolean };
 
@@ -157,19 +158,22 @@ function TopBar() {
           <span className="text-faint">/</span>
           <span className="text-text">{section.label}</span>
         </div>
-        <div className="relative ml-auto">
-          <button type="button" className="px-btn px-btn--ghost px-btn--sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-            <Icon name="agent" size={13} />
-            Connect agent
-          </button>
-          {open && (
-            <>
-              <button type="button" aria-label="Close" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 top-10 z-50 w-[min(560px,90vw)] shadow-2xl shadow-black/60">
-                <ConnectAgent />
-              </div>
-            </>
-          )}
+        <div className="ml-auto flex items-center gap-2">
+          <SignInAlert />
+          <div className="relative">
+            <button type="button" className="px-btn px-btn--ghost px-btn--sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+              <Icon name="agent" size={13} />
+              Connect agent
+            </button>
+            {open && (
+              <>
+                <button type="button" aria-label="Close" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+                <div className="absolute right-0 top-10 z-50 w-[min(560px,90vw)] shadow-2xl shadow-black/60">
+                  <ConnectAgent />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
       {/* Small screens: the sidebar's sections as a scrollable row. */}

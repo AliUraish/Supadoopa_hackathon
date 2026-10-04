@@ -306,7 +306,8 @@ def test_dashboard_run_records_the_run(client, clinic, signed_in, site, store):
     tool = run(store.get_tool(clinic.list_id))
     assert tool["runs_count"] == 1 and tool["success_rate"] == 1.0 and tool["p50_ms"] == 12
     call = events(store, "execute.call")[-1]
-    assert call["data"]["inputs"] == ["day"] and "2026-10-04" not in json.dumps(call)
+    logged = {k: v for k, v in call.items() if k != "created_at"}  # the date may be today
+    assert call["data"]["inputs"] == ["day"] and "2026-10-04" not in json.dumps(logged)
 
 
 def test_profile_and_consent(client, clinic, signed_in, site, store):

@@ -31,6 +31,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from . import browser as browser_mod
+from . import sessions
 from .interfaces import STRATEGIES, ExecResult, Strategy, VerifyResult
 from .spec import (
     BLOCKED_HEADERS,
@@ -117,6 +118,9 @@ async def _run_api(spec: dict, inputs: dict, base_url: str, _browser: Any) -> Ex
                 headers[key] = value if isinstance(value, str) else _text(value)
         body = req.get("body")
         body = render(body, inputs.get) if body is not None and method != "GET" else None
+        # A saved sign-in for this run (never part of the spec): send its cookies.
+        if cookie := sessions.cookie_header(sessions.CURRENT.get(), url):
+            headers["cookie"] = cookie
     except (ValueError, TypeError) as exc:
         return ExecResult(ok=False, strategy="api", error=str(exc), broken=True, steps=0)
 

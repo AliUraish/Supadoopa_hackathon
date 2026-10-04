@@ -23,7 +23,8 @@ log = logging.getLogger(__name__)
 HEARTBEAT_S = 5.0
 REQUEUE_S = 30.0
 STALE_S = 60
-TIMEOUTS_S = {"discover": 300, "verify": 300, "heal": 300, "optimize": 600, "race": 240}
+# discover/heal may wait up to 10 min for a person to sign in (liveview.HUMAN_WAIT_S)
+TIMEOUTS_S = {"discover": 900, "verify": 300, "heal": 900, "optimize": 600, "race": 240}
 ALL_KINDS = tuple(TIMEOUTS_S)
 
 
