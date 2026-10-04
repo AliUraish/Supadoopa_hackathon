@@ -704,7 +704,7 @@ Run sandboxes on their own: `uv run python -m app.doorway.sandbox --id sandbox-1
 ## Tests
 
 ```bash
-cd backend && uv run pytest     # 165 test functions across 14 files
+cd backend && uv run pytest     # 208 passed (165 test functions, some parametrized, 14 files) in ~4 min on 2026-10-03
 cd backend && uv run ruff check .
 cd frontend && npm run lint && npm run build
 ```
