@@ -15,7 +15,8 @@
 ## Contents
 
 1. [In one minute](#in-one-minute)
-2. [What is new here](#what-is-new-here)
+2. [**What you can do: create tools, take over a sandbox**](#what-you-can-do)
+3. [What is new here](#what-is-new-here)
 3. [The pipeline](#the-pipeline-request--heal)
 4. [Architecture](#architecture)
 5. [**Supabase in depth (Compute first)**](#supabase-in-depth)
@@ -72,6 +73,44 @@ cd backend && uv run pytest     # 208 passed, 0 skipped (2026-10-03) with stripe
 ```
 
 The tables behind the dashboard (`doorway_jobs`, `doorway_tool_versions`, `doorway_races` and so on) are publicly readable through Supabase with the publishable key, so every number above can be traced to rows.
+
+---
+
+## What you can do
+
+### Create tools for any website
+
+Give Doorway a URL and a goal. A Supabase Compute sandbox explores the site, a second sandbox verifies the tools against the live site, and they are published to every MCP client within minutes. You don't write a scraper, a spec or an integration. There are four ways to start:
+
+| From | How | What happens |
+|---|---|---|
+| **The dashboard** | **Sites** tab → **Add site** (URL, optional name, goal) | `POST /doorway/sites` queues a `discover` job. The site card walks through `queued → discovering → verifying → ready`, the **Sandboxes** tab shows the sandbox's browser exploring live, and the tools appear in the **Tools** tab and on MCP |
+| **Your agent, over MCP** | `doorway_create_tools(website, goal)` → `doorway_get_tools(site_id)` → `doorway_call_tool("<site>__<tool>", arguments)` | The agent asks for a new website and **uses its tools in the same session**, with no restart and no re-listing. `doorway_get_tools` waits up to 50 s per call and returns the tools with their input schemas as soon as they are verified |
+| **Plain HTTP** | `POST /doorway/requests {"website", "task"}`, then poll `GET /doorway/requests/{id}` | If a verified tool already matches the task it runs at once; otherwise discovery is queued and the request moves on when the tool is ready |
+| **The Workspace console** | Type a website and a task in the dashboard | Same as the HTTP request, with the request's events streaming beside it |
+
+To rebuild a site's tools, use `POST /doorway/sites/{id}/rediscover` (or **Rediscover** on the site page). Rebuilt tools keep their names, so connected agents are not affected.
+
+```text
+You (in Claude Code):  "Book me the earliest appointment at https://doorway-clinic.vercel.app/"
+Claude → doorway_create_tools(website="https://doorway-clinic.vercel.app/", goal="book an appointment")
+       ← {site_id: "sunrise-clinic", status: "ready", tools: [list_doctors, list_slots, book_appointment]}
+Claude → doorway_call_tool("sunrise-clinic__list_slots", {...})          free read
+Claude → doorway_call_tool("sunrise-clinic__book_appointment", {...})    $0.50 action (MPP)
+```
+
+### Take over a sandbox to sign in
+
+Many useful sites sit behind a login, a CAPTCHA or a 2FA prompt. When a sandbox reaches one, it **does not fail. It pauses with the browser open** (for up to 10 minutes) and asks for a person:
+
+1. Every dashboard page shows an alert, **"<site> needs your sign-in"**, and the **Sandboxes** tab shows that sandbox's card in amber with a **Take over** button.
+2. **Take over** opens a live view of the sandbox's own browser (an MJPEG stream at about 8 fps). You click, type, scroll and press keys on the real page, and a separate password box sends credentials with **Send** or **Send + Enter**. Everything is typed straight into the site's own form inside the sandbox.
+3. **I'm signed in, save session** hands the browser back. The sandbox keeps exploring as a signed-in user, and the tools it builds work behind the login. **Cancel sign-in** ends the job instead.
+4. The resulting browser session (cookies and local storage, **never the password**) is encrypted and saved for you and that site in a private Supabase Storage bucket. Your later calls to that site's tools run signed in as you. **Profile → Connected sites** lists your saved sign-ins and lets you disconnect any of them (`GET` / `DELETE /doorway/sessions`).
+
+Taking control needs your Doorway session (the dashboard's automatic guest session works). The one-time control token is issued to you only, and while a sandbox waits for a person, its screen is hidden from everyone else.
+
+Current state: the takeover backend accepts a claim **while a sandbox is paused at a sign-in screen**. The dashboard also shows **Take over** and **Hand back** on any working sandbox; those two actions wait on a later backend update. The sandbox image on Compute must be pushed again before takeover works on the live deployment (see [known limits](#status-and-known-limits)). How it works inside is described [under Supabase Compute](#taking-over-a-sandbox-to-sign-in).
 
 ---
 
