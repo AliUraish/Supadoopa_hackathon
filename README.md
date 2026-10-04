@@ -17,23 +17,23 @@
 1. [In one minute](#in-one-minute)
 2. [**What you can do: create tools, take over a sandbox**](#what-you-can-do)
 3. [What is new here](#what-is-new-here)
-3. [The pipeline](#the-pipeline-request--heal)
-4. [Architecture](#architecture)
-5. [**Supabase in depth (Compute first)**](#supabase-in-depth)
-6. [**Stripe in depth**](#stripe-in-depth)
-7. [**Vercel in depth**](#vercel-in-depth)
-8. [How a website becomes a tool](#how-a-website-becomes-a-tool)
-9. [Self-healing](#self-healing)
-10. [Shared memory between sandboxes](#shared-memory-between-sandboxes-patterns-and-lessons)
-11. [The race: broker vs. browser agent](#the-race-broker-vs-browser-agent)
-12. [Agent interfaces (MCP, HTTP, llms.txt, OpenAPI)](#agent-interfaces)
-13. [Safety, privacy and trust model](#safety-privacy-and-trust-model)
-14. [Frontend](#frontend-the-doorway-dashboard)
-15. [Run it locally](#run-it-locally)
-16. [Tests](#tests)
-17. [Repository map](#repository-map)
-18. [Status and known limits](#status-and-known-limits)
-19. [Reviewer's guide: claims and where to verify them](#reviewers-guide-claims-and-where-to-verify-them)
+4. [The pipeline](#the-pipeline-request--heal)
+5. [Architecture](#architecture)
+6. [**Supabase in depth (Compute first)**](#supabase-in-depth)
+7. [**Stripe in depth**](#stripe-in-depth)
+8. [**Vercel in depth**](#vercel-in-depth)
+9. [How a website becomes a tool](#how-a-website-becomes-a-tool)
+10. [Self-healing](#self-healing)
+11. [Shared memory between sandboxes](#shared-memory-between-sandboxes-patterns-and-lessons)
+12. [The race: broker vs. browser agent](#the-race-broker-vs-browser-agent)
+13. [Agent interfaces (MCP, HTTP, llms.txt, OpenAPI)](#agent-interfaces)
+14. [Safety, privacy and trust model](#safety-privacy-and-trust-model)
+15. [Frontend](#frontend-the-doorway-dashboard)
+16. [Run it locally](#run-it-locally)
+17. [Tests](#tests)
+18. [Repository map](#repository-map)
+19. [Status and known limits](#status-and-known-limits)
+20. [Reviewer's guide: claims and where to verify them](#reviewers-guide-claims-and-where-to-verify-them)
 
 ---
 
@@ -94,9 +94,12 @@ To rebuild a site's tools, use `POST /doorway/sites/{id}/rediscover` (or **Redis
 ```text
 You (in Claude Code):  "Book me the earliest appointment at https://doorway-clinic.vercel.app/"
 Claude → doorway_create_tools(website="https://doorway-clinic.vercel.app/", goal="book an appointment")
-       ← {site_id: "sunrise-clinic", status: "ready", tools: [list_doctors, list_slots, book_appointment]}
+       ← {"site_id": "sunrise-clinic", "status": "ready", "tools": [
+            "sunrise-clinic__list_doctors", "sunrise-clinic__list_slots", "sunrise-clinic__book_appointment"]}
+         (for a site Doorway hasn't seen yet: "status": "working" → call doorway_get_tools(site_id) until "ready")
 Claude → doorway_call_tool("sunrise-clinic__list_slots", {...})          free read
-Claude → doorway_call_tool("sunrise-clinic__book_appointment", {...})    $0.50 action (MPP)
+Claude → doorway_call_tool("sunrise-clinic__book_appointment", {...})    $0.50 action (MPP; paymentLink, or auto-paid
+                                                                           in test mode with the owner key)
 ```
 
 ### Take over a sandbox to sign in
