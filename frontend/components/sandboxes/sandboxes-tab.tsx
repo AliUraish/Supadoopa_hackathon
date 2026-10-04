@@ -30,6 +30,8 @@ export function SandboxesTab({ active }: { active: boolean }) {
   const [signingIn, setSigningIn] = useState<string | null>(null);
   const waiting = (compute?.sandboxes ?? []).filter((c) => c.needs_human);
   const takeoverSandbox = compute?.sandboxes.find((c) => c.sandbox === signingIn);
+  // Sandboxes built with takeover report `needs_human` (even when null) in their state.
+  const takeoverReady = Boolean(compute?.sandboxes.some((c) => "needs_human" in c));
 
   const list = [...(sandboxes.data ?? [])].sort((a, b) => byNaturalId(a.id, b.id));
   const busy = list.filter((s) => s.status === "busy").length;
@@ -108,6 +110,7 @@ export function SandboxesTab({ active }: { active: boolean }) {
                 refreshMs={refreshMs}
                 compute={compute?.sandboxes.find((c) => c.sandbox === s.id)}
                 onSignIn={() => setSigningIn(s.id)}
+                takeoverReady={takeoverReady}
                 lastAction={events.items.find((e) => e.sandbox_id === s.id)}
               />
             ))}
@@ -172,6 +175,7 @@ function SandboxCard({
   refreshMs,
   compute,
   onSignIn,
+  takeoverReady,
   lastAction,
 }: {
   sandbox: Sandbox;
@@ -180,6 +184,7 @@ function SandboxCard({
   refreshMs: number;
   compute?: ComputeSandbox;
   onSignIn: () => void;
+  takeoverReady: boolean;
   lastAction?: DoorwayEvent;
 }) {
   const now = useNow();
@@ -244,13 +249,23 @@ function SandboxCard({
           variant={needsSignIn ? "primary" : "ghost"}
           icon="agent"
           onClick={onSignIn}
-          disabled={!(working || compute?.live || needsSignIn)}
-          title={working || compute?.live ? "Control this sandbox's browser and enter your details" : "Available while the sandbox runs a job"}
+          disabled={!takeoverReady || !(working || compute?.live || needsSignIn)}
+          title={
+            !takeoverReady
+              ? "This sandbox build doesn't support takeover yet"
+              : working || compute?.live
+                ? "Control this sandbox's browser and enter your details"
+                : "Available while the sandbox runs a job"
+          }
         >
           Take over
         </Button>
         <span className="text-xs text-faint">
-          {working || compute?.live ? "Click, type and sign in on its screen" : "Available while it runs a job"}
+          {!takeoverReady
+            ? "Takeover arrives with the next sandbox update"
+            : working || compute?.live
+              ? "Click, type and sign in on its screen"
+              : "Available while it runs a job"}
         </span>
       </div>
       {lastAction && (

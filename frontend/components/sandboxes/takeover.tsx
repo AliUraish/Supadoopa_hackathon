@@ -292,6 +292,13 @@ function ClaimError({ error }: { error: unknown }) {
       </Banner>
     );
   }
+  if (status === 0) {
+    return (
+      <Banner tone="warn" title="Takeover isn't available on this sandbox yet">
+        The sandbox service doesn&apos;t accept takeover requests yet. It arrives with the next sandbox deploy.
+      </Banner>
+    );
+  }
   if (status === 404 || status === 405) {
     return (
       <Banner tone="info" title="Can't take over right now">
