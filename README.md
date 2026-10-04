@@ -80,7 +80,7 @@ The tables behind the dashboard (`doorway_jobs`, `doorway_tool_versions`, `doorw
 
 ### Create tools for any website
 
-Give Doorway a URL and a goal. A Supabase Compute sandbox explores the site, a second sandbox verifies the tools against the live site, and they are published to every MCP client within minutes. You don't write a scraper, a spec or an integration. There are four ways to start:
+Give Doorway a URL and a goal. A Supabase Compute sandbox explores the site, a second sandbox verifies the tools against the live site, and they are published to every MCP client as soon as verification passes. You don't write a scraper, a spec or an integration. There are four ways to start:
 
 | From | How | What happens |
 |---|---|---|
@@ -106,7 +106,7 @@ Claude → doorway_call_tool("sunrise-clinic__book_appointment", {...})    $0.50
 
 Many useful sites sit behind a login, a CAPTCHA or a 2FA prompt. When a sandbox reaches one, it **does not fail. It pauses with the browser open** (for up to 10 minutes) and asks for a person:
 
-1. Every dashboard page shows an alert, **"<site> needs your sign-in"**, and the **Sandboxes** tab shows that sandbox's card in amber with a **Take over** button.
+1. The dashboard's top bar shows an alert, **"<site> needs your sign-in"**, and the **Sandboxes** tab shows that sandbox's card in amber with a **Take over** button.
 2. **Take over** opens a live view of the sandbox's own browser (an MJPEG stream at about 8 fps). You click, type, scroll and press keys on the real page, and a separate password box sends credentials with **Send** or **Send + Enter**. Everything is typed straight into the site's own form inside the sandbox.
 3. **I'm signed in, save session** hands the browser back. The sandbox keeps exploring as a signed-in user, and the tools it builds work behind the login. **Cancel sign-in** ends the job instead.
 4. The resulting browser session (cookies and local storage, **never the password**) is encrypted and saved for you and that site in a private Supabase Storage bucket. Your later calls to that site's tools run signed in as you. **Profile → Connected sites** lists your saved sign-ins and lets you disconnect any of them (`GET` / `DELETE /doorway/sessions`).
